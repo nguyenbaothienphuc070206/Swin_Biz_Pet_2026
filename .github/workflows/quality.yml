@@ -1,0 +1,141 @@
+name: PawCare quality
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      PAWCARE_AI_EVAL_REQUIRED: "0"
+      PAWCARE_AI_PROVIDER: ${{ vars.PAWCARE_AI_PROVIDER || 'mock' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run security:deps
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run test:ai-evals
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start -x studio,edge-runtime,imgproxy
+      - run: supabase test db
+      - run: docker exec -i supabase_db_pawcare-local psql -U postgres -d postgres < supabase/benchmarks/hot-queries.sql > hot-query-plans.txt
+      - run: npm run security:rls
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pawcare-hot-query-plans
+          path: hot-query-plans.txt
+          retention-days: 30
+      - run: npm run security:sbom
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pawcare-sbom
+          path: sbom.cdx.json
+          retention-days: 90
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:api
+      - run: npm run test:e2e:demo
+      - run: npm run a11y
+      - run: npm run perf:budget
+        env:
+          NODE_ENV: production
+          PAWCARE_AI_PROVIDER: mock
+          NEXT_PUBLIC_SITE_URL: https://pawcare.invalid
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key-1234567890
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key-1234567890
+      - name: Lighthouse CI budgets
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            http://127.0.0.1:4178/vi
+            http://127.0.0.1:4178/en
+            http://127.0.0.1:4178/vi/clinics
+            http://127.0.0.1:4178/en/clinics
+            http://127.0.0.1:4178/vi/demo
+          configPath: ./.lighthouserc.json
+          runs: 3
+          uploadArtifacts: true
+        env:
+          NODE_ENV: production
+          PAWCARE_AI_PROVIDER: mock
+          NEXT_PUBLIC_SITE_URL: https://pawcare.invalid
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key-1234567890
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key-1234567890
+  visual-regression:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm run test:visual
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  preview-deploy-and-e2e:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: [checks, visual-regression, secret-scan]
+    runs-on: ubuntu-latest
+    environment: preview
+    permissions:
+      contents: read
+      deployments: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm install --global vercel@latest
+      - run: vercel pull --yes --environment=preview --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - run: vercel build --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - id: deploy
+        shell: bash
+        run: |
+          url="$(vercel deploy --prebuilt --token='${{ secrets.VERCEL_TOKEN }}')"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Run mobile E2E against preview
+        run: npm run test:e2e:demo
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.deploy.outputs.url }}

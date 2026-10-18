@@ -1,0 +1,47 @@
+# PawCare release checklist
+
+Independent repository audit: 2026-10-18. This checklist reflects the current workspace, not a hosted staging environment or a legal/clinical approval. `docs/spec.md` is absent, so P0 acceptance could only be compared against `AGENTS.md`, `docs/testing.md`, the feature design documents, and the existing progress log. Do not represent the P0 journeys as release-verified until the product owner restores or approves the consolidated spec and the checks below pass.
+
+## Findings by severity
+
+| Severity | Finding | Status / action |
+| --- | --- | --- |
+| High — release blocker | No consolidated `docs/spec.md`; there is no authoritative acceptance-criteria list for the requested P0 sign-off. | Open. Product owner must restore/approve the spec and map every P0 criterion to an executable test. |
+| High — release blocker | Database migrations, PostGIS queries, RLS policies, pgTAP tests, and SQL authorization semantics have not been run in this workspace. `npm run security:rls` fails because the Supabase CLI is unavailable. | Open. Clinic partner / platform engineer: provision isolated local and staging Supabase environments, apply migrations, run pgTAP and inspect failures before enabling live data. |
+| High — release blocker | Authenticated E2E and IDOR tests cannot pass without disposable Supabase identities and fixtures. `npm run test:e2e` ran 13 tests: 4 passed and 9 failed at required E2E configuration/fixture checks (none were skipped). | Open. Platform engineer and clinic partner: configure all role accounts and pet/clinic/appointment/SOS/community fixtures, then pass `npm run test:e2e`. |
+| High — release blocker | P0 completion is not demonstrated end to end. The repository progress log records live passport consent/share flows and multi-owner invitations as incomplete; live directory filters, booking cancellation/rescheduling, reminders and clinic confirmation as incomplete; SOS Realtime/push fan-out, 90-second timeout/radius expansion, clinic inbox and scheduled jobs as incomplete. The clinic workspace also lacks production data verification. | Open. Product owner and engineering: implement/verify each criterion from the approved spec; vet adviser must approve SOS rules and fallback wording; clinic partner must verify dispatch, availability and staff workflows. Demo flows do not satisfy this gate. |
+| High — release blocker | Upload malware scanning is only an integration hook. No scanner worker is connected, and user uploads must remain unpublished until scan results are fail-closed. | Open. Platform engineer/security owner: connect and exercise a malware-scanning worker; clinic partner verifies document workflow. |
+| High — safety/legal gate | SOS routing, tele-triage, veterinary rules and public emergency claims are not clinically or legally approved. Demo rules are marked as demo. | Open. Vet adviser reviews the rules, urgency mapping and clinical copy; lawyer reviews tele-consultation, responsibility, location, response-time and emergency disclosures in `docs/legal-open-questions.md`. |
+| High — current verification gap | `npm run perf:budget` did not produce measurements: its production server exited before readiness on this Windows runner. `docs/performance.md` contains earlier CI numbers, not a measurement from this audit. | Open. CI/platform engineer: run the budget and Lighthouse jobs in a clean CI environment; attach current route results. |
+| Medium | Admin MFA, route-level authorization and RLS are implemented in source, but hosted Supabase MFA/session policy and cross-role/cross-clinic IDOR coverage remain unverified. | Open. Platform engineer: configure hosted AAL2/session settings and complete role-by-role IDOR tests against staging. |
+| Medium | Account export has per-query limits; account deletion records a request but does not perform erasure. Retention and exceptions are intentionally undecided. | Open. Lawyer sets lawful retention/deletion requirements; product owner approves scope; engineering implements complete paginated export and the approved deletion workflow. |
+| Medium | Provider-backed AI evaluation, real SOS delivery, external notifications, video and payment gateway flows are not verified. AI evals pass only with the deterministic mock; billing is sandbox-only. | Open. Vet adviser reviews medical safety; platform engineer configures provider credentials/adapters; payment account owner completes merchant onboarding and sandbox/UAT using official vendor docs; lawyer reviews payment and disclosure obligations. |
+| Medium | CI secret scanning and hosted deployment gates are configured but were not executed in this local audit. No Git metadata is available here to verify repository history or branch protections. | Open. Repository owner: confirm Gitleaks/CodeQL, protected branches, GitHub Environments, Vercel and Supabase secrets/approvals in the actual GitHub repository. |
+| Low | Lint passes with 39 warnings after removing unused imports; most remaining warnings are existing hook purity, image, `any`, and navigation warnings. | Track cleanup in a later quality pass; the current configured warning cap is not exceeded. |
+| Low | No `TODO`, `FIXME`, `XXX`, `shortcut:` or `ponytail:` markers were found in the inspected source/docs paths. Dependency review found no missing or strong-copyleft license declarations among 232 production lockfile packages. This is a metadata scan, not legal advice. | Re-run dependency/license review when the lockfile changes; lawyer decides license compatibility for distribution. |
+
+## P0 acceptance status
+
+| P0 area | Audit status | Required evidence before release |
+| --- | --- | --- |
+| Digital Health Passport | Partial / not release-verified | Authenticated owner and clinic journeys; scope and expiry grant tests; immediate revoke test; audit visibility; append-only amendments; PDF/export; offline conflict recovery; cross-owner and cross-clinic RLS tests. |
+| Clinic directory and Booking | Partial / not release-verified | Live verified-clinic search/filter and map/list; ranking unit suite; hours/holiday-aware availability; concurrent transactional booking test; cancel/reschedule policy; reminders and `.ics`; completed-visit-only review behavior. |
+| SOS and Tele-Triage | Demo passes; live dispatch not release-verified | Vet-approved rule table; real PostGIS radius query; parallel clinic ping; atomic first accept; 90-second timeout and radius expansion job; fallback list/hotline; offline/cancel/rate-limit behavior; clinic inbox and session-scoped consent; full authenticated E2E and alert test. |
+| Clinic workspace basics | Partial / not release-verified | Clinic-scoped role tests; patient search constrained by active consent; operational Today/appointment/SOS flows; staff scheduling and permissions; audit-complete entries and export; staging data verification with a clinic partner. |
+
+## Checks completed in this audit
+
+- Passed: `npm run lint` (0 errors, 39 warnings; within the 41-warning cap), `npm run typecheck`, `npm run test:unit` (24 files / 73 tests), `npm run test:ai-evals` (120/120 mock cases), `npm run test:api` (2/2), `npm run test:e2e:demo` (1/1), `npm run a11y` (11/11), `npm run test:visual` (3/3), `npm run contrast`, `npm run security:deps` (0 known production vulnerabilities), and `npm run security:sbom`.
+- Translation key parity: Vietnamese 703 keys, English 703 keys, no key mismatches. This does not prove natural wording on every screen.
+- Production lockfile license metadata: 232 packages checked, no unknown declarations or AGPL/GPL/SSPL licenses detected.
+- Failed/unavailable: `npm run security:rls` (Supabase CLI unavailable); `npm run perf:budget` (production server exited before readiness); authenticated `npm run test:e2e` (4 passed, 9 failed because E2E accounts/fixtures are not configured).
+- An initial parallel Playwright run collided on port 3100; API tests were rerun sequentially and passed. The visual suite passed but emitted a caret-style hydration warning during screenshot capture; confirm in CI whether this is the test harness or app output.
+- Secret source scan found no obvious committed token/private-key patterns in the inspected source paths. `.env.example` is the only environment file present. Repository history scanning could not be verified because this workspace has no Git metadata.
+
+## External owners and launch decisions
+
+- **Lawyer:** resolve every open item in `docs/legal-open-questions.md`; set retention/deletion, consent and disclosure rules before enabling production sharing, fundraising, subscriptions or tracking.
+- **Vet adviser:** approve SOS urgency and fallback tables, contraindication rules, care-plan rules and labels, and AI safety/medical copy. Demo tables cannot be treated as clinical advice.
+- **Clinic partner:** validate verification documents, schedules, slot handling, appointment operations, SOS notifications/response workflow, record access and clinic workspace usability in staging.
+- **Payment account owner:** complete provider account/merchant setup, credentials, sandbox/UAT and reconciliation configuration. No real payment call is enabled by this repository audit.
+- **Product owner / platform engineer:** supply the approved `docs/spec.md`, close the P0 evidence gaps, provision staging and test fixtures, run RLS/E2E/performance/secret-scanning gates, connect malware scanning, and confirm deployment protections and rollback readiness.

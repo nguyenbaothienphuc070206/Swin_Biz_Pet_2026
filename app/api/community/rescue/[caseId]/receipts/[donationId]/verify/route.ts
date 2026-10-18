@@ -1,0 +1,3 @@
+import { z } from "zod";
+import { requireRole } from "@/lib/auth/server";
+export async function POST(_request:Request,context:{params:Promise<{caseId:string;donationId:string}>}){const {caseId,donationId}=await context.params;if(!z.string().uuid().safeParse(caseId).success||!z.string().uuid().safeParse(donationId).success)return Response.json({error:"invalid_receipt_id"},{status:400});const {supabase}=await requireRole(["clinic_admin","owner"],"vi");const {data,error}=await supabase.rpc("verify_donation_receipt",{p_donation:donationId});return error?Response.json({error:error.message},{status:400}):Response.json({verified:data===true})}

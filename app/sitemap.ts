@@ -1,0 +1,6 @@
+import type {MetadataRoute} from "next";
+import {createClient,isSupabaseConfigured} from "@/lib/supabase/server";
+
+export const dynamic="force-dynamic";
+
+export default async function sitemap():Promise<MetadataRoute.Sitemap>{const site=process.env.NEXT_PUBLIC_SITE_URL;if(!site)return [];const paths=["/vi","/en","/vi/clinics","/en/clinics"];const languages=(path:string)=>({"vi-VN":new URL(path.replace(/^\/en(?=\/|$)/,"/vi"),site).toString(),"en-US":new URL(path.replace(/^\/vi(?=\/|$)/,"/en"),site).toString()});let clinics:{id:string}[]=[];if(isSupabaseConfigured()){const supabase=await createClient();const {data}=await supabase.from("clinics").select("id").eq("published",true).eq("verified",true).eq("is_demo",false).limit(5000);clinics=data??[];}const staticUrls:MetadataRoute.Sitemap=paths.map((path,index)=>({url:new URL(path,site).toString(),alternates:{languages:languages(path)},changeFrequency:index<2?"weekly":"daily",priority:index<2?1:0.7}));const clinicUrls:MetadataRoute.Sitemap=clinics.flatMap(({id})=>(["vi","en"] as const).map(locale=>{const path=`/${locale}/clinics/${id}`;return {url:new URL(path,site).toString(),alternates:{languages:languages(path)},changeFrequency:"weekly" as const,priority:0.6};}));return [...staticUrls,...clinicUrls];}

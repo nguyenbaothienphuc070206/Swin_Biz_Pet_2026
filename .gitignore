@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+playwright-report/
+test-results/
+coverage/
+.playwright-browsers/
+.swc-cache/
+.swc-cache-local/
+.superpowers/
+sbom.cdx.json
+*.tsbuildinfo
+.env*
+!.env.example

@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-heading);
+}
+
+:root {
+  color-scheme: light;
+  --background: #f7f5ef;
+  --foreground: #20332e;
+  --card: #fffdf8;
+  --card-foreground: #20332e;
+  --primary: #1e594c;
+  --primary-foreground: #ffffff;
+  --secondary: #e4eee8;
+  --secondary-foreground: #254d40;
+  --muted: #edf0ea;
+  --muted-foreground: #4b6059;
+  --accent: #a9422e;
+  --accent-foreground: #ffffff;
+  --destructive: #a52424;
+  --destructive-foreground: #ffffff;
+  --border: #d7ded6;
+  --input: #6e7b71;
+  --ring: #1e594c;
+  --success: #1e594c;
+  --warning: #704500;
+  --warning-surface: #fff1cf;
+  --info: #174f72;
+  --info-surface: #e3f1f8;
+  --sos: #a52424;
+  --sos-surface: #fff0ed;
+  --verified: #1e594c;
+  --font-body: "Be Vietnam Pro", "Segoe UI", sans-serif;
+  --font-heading: "DM Sans", "Be Vietnam Pro", sans-serif;
+  --space-unit: 0.25rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(32 51 46 / 5%), 0 8px 24px rgb(32 51 46 / 4%);
+  --shadow-popover: 0 18px 52px rgb(19 41 34 / 16%);
+  --motion-fast: 100ms;
+  --motion-standard: 160ms;
+  --motion-gentle: 240ms;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #111b18;
+  --foreground: #e7eee9;
+  --card: #192521;
+  --card-foreground: #e7eee9;
+  --primary: #89d5b5;
+  --primary-foreground: #10231b;
+  --secondary: #273b32;
+  --secondary-foreground: #d9ece0;
+  --muted: #24312c;
+  --muted-foreground: #b4c5bc;
+  --accent: #f2a18d;
+  --accent-foreground: #32150f;
+  --destructive: #ffb4a9;
+  --destructive-foreground: #3d0807;
+  --border: #35463e;
+  --input: #738379;
+  --ring: #a0e3c5;
+  --success: #a0e3c5;
+  --warning: #ffcf7c;
+  --warning-surface: #382a14;
+  --info: #9bd8fa;
+  --info-surface: #152c3a;
+  --sos: #ffb4a9;
+  --sos-surface: #3a201d;
+  --verified: #a0e3c5;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 18%), 0 8px 24px rgb(0 0 0 / 10%);
+  --shadow-popover: 0 18px 52px rgb(0 0 0 / 42%);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
+:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+::selection { background: var(--primary); color: var(--primary-foreground); }
+
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1000;
+  transform: translateY(-150%);
+  border-radius: var(--radius-sm);
+  background: var(--foreground);
+  color: var(--background);
+  padding: 0.75rem 1rem;
+}
+.skip-link:focus { transform: translateY(0); }
+.motion-safe { transition: color var(--motion-standard), background-color var(--motion-standard), border-color var(--motion-standard), box-shadow var(--motion-standard), transform var(--motion-standard); }
+@keyframes pawcare-success-in {
+  from { opacity: 0; transform: translateY(0.25rem) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .success-enter { animation: pawcare-success-in 220ms ease-out both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+@import "maplibre-gl/dist/maplibre-gl.css";

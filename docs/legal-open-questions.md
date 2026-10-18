@@ -1,0 +1,40 @@
+# Legal questions for counsel
+
+- Which veterinary tele-consultation and remote triage activities may PawCare facilitate, and what licensing, disclosures, recordkeeping, and professional responsibility rules apply?
+- What rules apply to fundraising and donation collection for rescue cases, including platform custody, disbursement, receipts, fees, and anti-fraud controls?
+- What affiliate, sponsored placement, product recommendation, and advertising disclosures are required, and where must they appear?
+- What legal basis, notices, consent, retention, access, sharing, export, correction, and deletion processes apply to pet-owner personal data and veterinary records?
+- What retention or deletion duties apply to medical records, access audit logs, clinic verification documents, account records, and backups after a deletion request?
+- What response-time or service-level claims, if any, may PawCare make about SOS routing and clinic responses?
+- What terms, consent, and liability notices are required for clinic verification, record-sharing grants, and remote triage sessions?
+- What consent, retention, disclosure, access, and deletion rules apply to precise SOS location, attached photos/voice notes, dispatch history, triage chat/notes, and push notifications to clinics?
+- What professional, consumer-protection, and liability rules govern preliminary urgency labels, emergency routing, hotline/fallback presentation, and statements about 24/7 availability or clinic response times?
+- What consent and recordkeeping are required for session-scoped sharing of a pet passport during tele-triage, and may any clinic staff access it before/after acceptance?
+- What safeguards, notice, retention, appeal, and non-discrimination rules apply to SOS rate limits, abuse signals, and false-alarm flags, especially where they could delay emergency assistance?
+- What requirements govern video/chat tele-triage, location transfers to clinics, and any future recording or transcription of remote sessions?
+- What contract, disclosure, tax-invoice, e-invoice, payment, dispute, and retention requirements apply to PawCare commission statements for bookings and SOS referrals, including whether a generated PDF may be called an invoice?
+- What consent, opt-out, channel, content, frequency, and recordkeeping rules apply to clinic vaccination reminder campaigns and other clinic-initiated messages?
+- What data minimization, access, retention, and disclosure rules apply to clinic staff roles, performance dashboards, patient exports, and financial CSV/PDF exports?
+- What professional and consumer-protection requirements apply to veterinarian-reviewed personalized care plans, the meaning of a “Vet-verified” label, vet approval records, owner-reported task completion, and reminders based on those plans?
+- What retention, correction, and disclosure requirements apply to versioned care-plan drafts, rule-set provenance, AI-generated wording, veterinarian edits/approvals, and superseded plans?
+- What affiliate disclosure wording and placement, attribution-cookie/identifier consent, click-log retention, and commission-reporting obligations apply to outbound product links?
+- What substantiation and liability requirements apply to product ingredient/allergen/condition-suitability metadata, recommendation explanations, and any health-related claims?
+- What advertising, sponsored-placement labeling, premium directory listing, business verification, and ranking-transparency requirements apply to spa/shop listings?
+- What rules govern publishing lost/found reports, pet photos, descriptions, the reporter's contact information, and location data; what notices, consent, access, retention, correction, and takedown process is required?
+- What minimum location fuzzing and aggregation thresholds are appropriate before publishing stray sightings or neighborhood population-control counts, and may the aggregated results be shared with authorities or rescue organizations?
+- What duties apply to community user content moderation, image safety review, report handling, appeals, takedown requests, and disputes about a reported pet match?
+- What verification standard, documentary evidence, eligibility, ongoing review, and suspension process should apply to rescue partners and clinics soliciting donations through case pages?
+- What professional and consumer-protection rules govern attaching, publishing, changing, and relying on a veterinarian's treatment estimate in a rescue case, including who is responsible for estimate accuracy?
+- What fundraising, solicitation, payment, tax, receipt, refund, fraud, and record-retention rules apply when donors pay a clinic or rescue partner directly and PawCare only publishes a receipt-verified ledger?
+- What donor information may appear in the public ledger, how should donor aliases and receipt evidence be handled, and what privacy and retention obligations apply to receipt verification records?
+- What consumer, payment, recurring-billing consent, cancellation, refund, grace-period, proration, chargeback, and disclosure duties apply to owner subscription plans and sandbox-to-live migration?
+- Which financial documents may PawCare issue for owner subscriptions and clinic commissions, what mandatory tax/e-invoice content and numbering rules apply, and may sandbox receipts/statements be displayed without being mistaken for invoices?
+- What payment data, webhook logs, reconciliation records, and failed-payment retry history may PawCare retain, and for how long?
+- What disclosure and evidence requirements apply to describing a rescue case, its verification status, estimated costs, direct-pay recipient, and verified contributions to the public?
+- What legal requirements apply to displaying or communicating a verified recipient's direct-payment instructions, and what controls are needed to prevent payment redirection or impersonation?
+- What retention periods and lawful exceptions apply to each category of owner, pet-health, clinic, rescue, payment, security, audit, AI and moderation data, including backups and vendor copies?
+- Which records must be retained after an account deletion request, which may be erased or de-identified, and what verification, completion timeline, notice and appeal process is required?
+- What lawful basis, notice, data-processing terms, localization/cross-border transfer requirements and deletion duties apply to Supabase, AI providers, email/push vendors and any future malware-scanning provider?
+- What retention and disclosure rules apply to malware scan metadata, file hashes, infected-file evidence and security incident records?
+- If analytics, attribution or advertising cookies/persistent identifiers are added, what consent, opt-out, retention and banner requirements apply?
+- What notice, retention and access requirements apply to redacted AI-run metadata, model/provider identifiers, evaluation records and cost telemetry?

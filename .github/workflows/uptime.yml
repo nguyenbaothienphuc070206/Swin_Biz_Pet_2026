@@ -1,0 +1,21 @@
+name: PawCare uptime
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check configured deployment
+        env:
+          PAWCARE_UPTIME_URL: ${{ vars.PAWCARE_UPTIME_URL }}
+          OBSERVABILITY_JOB_TOKEN: ${{ secrets.OBSERVABILITY_JOB_TOKEN }}
+        run: |
+          if [ -z "$PAWCARE_UPTIME_URL" ]; then
+            echo "PAWCARE_UPTIME_URL is not configured; skipping deployment probe."
+            exit 0
+          fi
+          node -e 'async function main(){const base=process.env.PAWCARE_UPTIME_URL;const healthUrl=new URL("/api/health",base);const health=await fetch(healthUrl,{signal:AbortSignal.timeout(15000)});const body=await health.json();if(!health.ok||body.status!=="ok")throw new Error(`health probe failed: HTTP ${health.status}`);console.log(JSON.stringify({status:body.status,url:healthUrl.origin+healthUrl.pathname}));if(process.env.OBSERVABILITY_JOB_TOKEN){const alertUrl=new URL("/api/observability/alerts",base);const result=await fetch(alertUrl,{headers:{authorization:`Bearer ${process.env.OBSERVABILITY_JOB_TOKEN}`},signal:AbortSignal.timeout(15000)});const report=await result.json();console.log(JSON.stringify({alertStatus:report.status,rules:report.rules,samples:report.samples}));if(!result.ok)throw new Error("observability alert rule fired or check failed");}}main().catch(e=>{console.error(e.message);process.exitCode=1;});'

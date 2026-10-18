@@ -1,0 +1,11 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select extensions.plan(6);
+select extensions.ok((select relrowsecurity from pg_class where oid='public.private_file_scans'::regclass),'private file scan state has RLS');
+select extensions.ok(exists(select 1 from pg_policies where schemaname='public' and tablename='private_file_scans' and policyname='private_file_scans_owner_read'),'owners can only inspect scan status for their own objects');
+select extensions.ok(exists(select 1 from pg_trigger where tgrelid='storage.objects'::regclass and tgname='track_private_upload_for_scan'),'private upload inserts enqueue a scanner hook');
+select extensions.ok(not has_function_privilege('authenticated','public.record_private_file_scan_result(text,text,text,text,text,text)','EXECUTE'),'clients cannot forge malware scan results');
+select extensions.ok(exists(select 1 from pg_trigger where tgrelid='public.community_posts'::regclass and tgname='ensure_clean_community_post'),'community media cannot be approved before clean scan');
+select extensions.ok(has_function_privilege('authenticated','public.record_vaccination(uuid,uuid,text,text,text,text,date,uuid,uuid)','EXECUTE'),'clinic offline retries use the idempotent vaccination RPC');
+select * from extensions.finish();
+rollback;
