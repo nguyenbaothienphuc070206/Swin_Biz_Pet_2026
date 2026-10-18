@@ -27,7 +27,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
       - name: Link staging project
@@ -75,7 +75,7 @@ jobs:
           fi
         env:
           BACKUP_CONFIRMED: ${{ vars.PRODUCTION_BACKUP_CONFIRMED }}
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
       - name: Link production project
