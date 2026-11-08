@@ -58,17 +58,17 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
-    "@playwright/test": "^1.56.1",
-    "@tailwindcss/postcss": "^4.1.17",
-    "@types/node": "^22.15.30",
+    "@playwright/test": "^1.65.0",
+    "@tailwindcss/postcss": "^4.3.4",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.7",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "axe-core": "^4.10.3",
-    "eslint": "^9.39.5",
-    "eslint-config-next": "^16.4.2",
+    "eslint": "^10.14.0",
+    "eslint-config-next": "^16.4.5",
     "tailwindcss": "^4.1.17",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   }
 }
