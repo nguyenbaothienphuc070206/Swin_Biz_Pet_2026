@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-25 — GitHub push and Vercel production deployment (`pawcare`)
+
+- Added explicit opt-in `PAWCARE_ALLOW_DEMO_RUNTIME=1` bypass in `lib/env.ts` (and documented `PAWCARE_ALLOW_DEMO_RUNTIME=0` default in `.env.example`) so demo deployments without live Supabase credentials boot cleanly while production remains fail-closed by default.
+- Added `.vercel/` to `.gitignore`, initialized local Git, rebased cleanly onto existing `origin/main` (`c57ca5e`), and pushed commit `e90ac09` to `https://github.com/nguyenbaothienphuc070206/Swin_Biz_Pet_2026.git` (`main`).
+- Created and linked Vercel project `pawcare` under `nguyenbaothienphuc070206s-projects`, configured `PAWCARE_ALLOW_DEMO_RUNTIME=1` and `PAWCARE_AI_PROVIDER=mock`, and deployed production (`dpl_3RhDS2e49x84cgRyqkn1Qf7yzAG3`) to `https://pawcare-beige-six.vercel.app`.
+- Verified `npm run typecheck` (0 errors), `npm run test:unit` (30 files, 120 tests passed, 98.55% lines), local `npm run build` (91/91 pages), and live HTTP 200 checks on Vercel.
+
 ## 2026-11-25 — Registration-only clinic profile setup and Settings-only editing
 
 - Removed `Practice Profile` (`Hồ sơ phòng khám`) navigation items from `components/shell/clinic-shell.tsx` (`ClinicShell`) and `components/clinic/clinic-home-view.tsx` (`Practice shortcuts`), and removed all links out to `/[locale]/clinic-profile-setup` from `components/clinic/clinic-settings-view.tsx`.
