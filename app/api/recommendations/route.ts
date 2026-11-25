@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { requireRole } from "@/lib/auth/server";
 import { recommendProducts, type ProductCandidate } from "@/modules/commerce/recommendations";
 
@@ -16,8 +16,8 @@ export async function GET(request: Request) {
   if (allergyResult.error || conditionResult.error || productResult.error) return Response.json({ error: "catalog_unavailable" }, { status: 503 });
   const ageMonths = petResult.data.birth_date ? Math.max(0, Math.floor((Date.now() - Date.parse(petResult.data.birth_date)) / 2_629_800_000)) : 0;
   const lifeStage = ageMonths < 12 ? "juvenile" : ageMonths >= 84 ? "senior" : "adult";
-  const pet = { species: petResult.data.species, lifeStage, allergies: allergyResult.data.map((item) => item.name), conditions: conditionResult.data.map((item) => item.name) };
-  const products: ProductCandidate[] = (productResult.data ?? []).map((row) => ({
+  const pet = { species: petResult.data.species, lifeStage, allergies: allergyResult.data.map((item: any) => item.name), conditions: conditionResult.data.map((item: any) => item.name) };
+  const products: ProductCandidate[] = (productResult.data ?? []).map((row: any) => ({
     id: row.id, species: row.species, lifeStages: row.life_stages, ingredients: row.ingredients,
     allergens: row.allergens, dietaryTags: row.dietary_tags, conditionExclusions: row.condition_exclusions,
     safetyReviewed: row.safety_reviewed, sponsored: row.sponsored, relevance: 0,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bayesianRating, rankClinics } from "./ranking";
+import { bayesianRating, rankClinics, rankByRating } from "./ranking";
 
 const clinic = (id: string, fields: Partial<Parameters<typeof rankClinics>[0][number]> = {}) => ({
   id, distanceKm: 1, ratingSum: 24, reviewCount: 6, medianResponseMinutes: 20, soonestSlotHours: 2, ...fields,
@@ -21,5 +21,17 @@ describe("clinic directory ranking", () => {
     expect(only.parts.response).toBe(1);
     expect(only.parts.availability).toBe(0);
     expect(only.score).toBeLessThanOrEqual(100);
+  });
+  it("ranks facilities by star rating descending and breaks ties by review count, distance and id", () => {
+    const facilities = [
+      { id: "clinic-b", rating: 4.8, reviewCount: 50, distanceKm: 2 },
+      { id: "spa-a", rating: 5.0, reviewCount: 180, distanceKm: 5 },
+      { id: "shop-c", rating: 4.8, reviewCount: 100, distanceKm: 3 },
+      { id: "clinic-d", rating: 4.8, reviewCount: 100, distanceKm: 1 },
+      { id: "shop-e", rating: 4.8, reviewCount: 100, distanceKm: 1 },
+      { id: "shop-f", rating: 4.8, reviewCount: 100, distanceKm: null },
+    ];
+    const ranked = rankByRating(facilities);
+    expect(ranked.map((f) => f.id)).toEqual(["spa-a", "clinic-d", "shop-e", "shop-c", "shop-f", "clinic-b"]);
   });
 });

@@ -1,18 +1,62 @@
-import Link from "next/link";
-import {getTranslations} from "next-intl/server";
-import {requireRole} from "@/lib/auth/server";
-import {AddPetForm} from "@/components/owner/add-pet-form";
-import {Card} from "@/components/ui";
-import {SaveOwnerOffline} from "@/components/pwa/save-owner-offline";
-import {OwnerOfflinePrivacyBridge} from "@/components/pwa/owner-privacy-bridge";
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
+import { requireRole, getOptionalUser } from "@/lib/auth/server";
+import { OwnerHomeView } from "@/components/owner/owner-home-view";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { effectivePlan } from "@/modules/billing/entitlements";
 
-export default async function OwnerHome({params,searchParams}:{params:Promise<{locale:string}>;searchParams:Promise<{created?:string;error?:string}>}) {
-  const [{locale},query]=await Promise.all([params,searchParams]); const t=await getTranslations("owner"); const common=await getTranslations("common");
-  const {supabase,userId}=await requireRole(["owner"],locale as "vi"|"en");
-  const {data:pets}=await supabase.from("pets").select("id,name,species,birth_date").eq("owner_id",userId).is("deleted_at",null).order("created_at");
-  return <div className="grid gap-8"><OwnerOfflinePrivacyBridge/><SaveOwnerOffline userId={userId}/><header><p className="text-sm font-semibold text-primary">{common("brand")}</p><h1 className="mt-2 font-display text-3xl font-bold md:text-4xl">{t("welcome")}</h1></header>
-    {query.created&&<p role="status" className="rounded-xl bg-secondary p-4">{t("saved")}</p>}
-    {!pets?.length?<Card className="max-w-2xl p-6 md:p-8"><h2 className="font-display text-2xl font-bold">{t("firstPet")}</h2><p className="mt-2 text-muted-foreground">{t("underMinute")}</p><AddPetForm locale={locale} error={query.error}/></Card>:<section><div className="mb-4 flex items-center justify-between"><h2 className="font-display text-2xl font-bold">{t("myPets")}</h2><Link href={`/${locale}/owner/pets`} className="font-semibold text-primary">{t("passport")}</Link></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{pets.map((pet)=><Card key={pet.id} className="p-5"><h3 className="text-lg font-bold">{pet.name}</h3><p className="text-sm text-muted-foreground">{pet.species==="dog"?t("dog"):pet.species==="cat"?t("cat"):t("other")}{pet.birth_date?` · ${new Intl.DateTimeFormat(locale).format(new Date(`${pet.birth_date}T12:00:00`))}`:""}</p></Card>)}</div></section>}
-    <section className="grid gap-4 sm:grid-cols-2"><Link href={`/${locale}/owner/sos`} className="rounded-2xl bg-destructive p-5 font-semibold text-destructive-foreground">{common("sos")}</Link><Link href={`/${locale}/owner/appointments`} className="rounded-2xl bg-secondary p-5 font-semibold">{t("bookings")}</Link></section>
-  </div>;
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const isEn = locale === "en";
+  return {
+    title: isEn ? "Owner Portal — PawCare" : "Trang chính Chủ nuôi — PawCare",
+    description: isEn
+      ? "Comprehensive pet health and medical passport management portal"
+      : "Trang chính quản lý y bạ, lịch tiêm phòng và đặt khám cho thú cưng",
+  };
+}
+
+export const dynamic = "force-dynamic";
+
+export default async function OwnerHome({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  // Ensure user is an authenticated owner (redirects to /sign-in if not authenticated)
+  await requireRole(["owner"], locale as "vi" | "en");
+  const user = await getOptionalUser();
+
+  const userName = user?.name || (locale === "en" ? "Pet Parent" : "Chủ nuôi");
+
+  let initialPlan: "free" | "premium" = "free";
+  if (isSupabaseConfigured() && process.env.SUPABASE_SERVICE_ROLE_KEY && user?.id) {
+    try {
+      const db = createServiceClient();
+      const { data: dbSub } = await db
+        .from("billing_subscriptions")
+        .select("plan_code,pending_plan_code,status,period_ends_at,grace_ends_at")
+        .eq("owner_id", user.id)
+        .in("status", ["pending", "active", "past_due", "cancelled"])
+        .maybeSingle();
+      if (dbSub) {
+        const plan = effectivePlan({
+          plan: (dbSub.plan_code ?? "free") as any,
+          pendingPlan: (dbSub.pending_plan_code ?? null) as any,
+          status: dbSub.status as any,
+          periodEndsAt: new Date(dbSub.period_ends_at).getTime(),
+          graceEndsAt: dbSub.grace_ends_at ? new Date(dbSub.grace_ends_at).getTime() : null,
+        });
+        initialPlan = plan === "premium" || plan === "plus" ? "premium" : "free";
+      }
+    } catch {}
+  }
+
+  return <OwnerHomeView userName={userName} initialPlan={initialPlan} />;
 }

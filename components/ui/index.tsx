@@ -549,3 +549,6 @@ export const sampleTableRows = [
 ];
 
 export const Icons = { CheckCircle2, ArrowUp, ArrowDown, Plus, ChevronLeft, ChevronRight };
+export { BackButton } from "./back-button";
+export { ImageLightbox } from "./image-lightbox";
+

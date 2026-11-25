@@ -8,7 +8,7 @@ create table public.billing_plans (
   updated_at timestamptz not null default now()
 );
 insert into public.billing_plans(code,amount_vnd,is_sandbox) values
- ('free',0,true),('plus',49000,true),('premium',99000,true)
+ ('free',0,true),('plus',49000,true),('premium',89000,true)
 on conflict(code) do nothing;
 
 create table public.billing_subscriptions (

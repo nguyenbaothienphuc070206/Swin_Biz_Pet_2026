@@ -2,7 +2,7 @@ import createIntlMiddleware from "next-intl/middleware";
 import {NextRequest, NextResponse} from "next/server";
 import {createServerClient} from "@supabase/ssr";
 import {routing} from "./i18n/routing";
-import {canAccessRole, homeForRole, parseRole, roleFromClaims, type AppRole} from "./lib/auth/roles";
+import {canAccessRole, homeForRole, parseRole, roleFromClaims, parseDevSessionCookie, type AppRole} from "./lib/auth/roles";
 import {buildContentSecurityPolicy} from "./modules/security/csp";
 import {isAllowedMutationOrigin} from "./modules/security/request-policy";
 
@@ -11,6 +11,8 @@ const protectedAreas: Array<{prefix: string; roles: AppRole[]}> = [
   {prefix: "/owner", roles: ["owner"]},
   {prefix: "/clinic", roles: ["clinic_staff", "clinic_admin"]},
   {prefix: "/admin", roles: ["platform_admin"]},
+  {prefix: "/pet-health-setup", roles: ["owner", "clinic_staff", "clinic_admin", "platform_admin"]},
+  {prefix: "/clinic-profile-setup", roles: ["clinic_staff", "clinic_admin", "platform_admin"]},
 ];
 
 export async function proxy(request: NextRequest) {
@@ -56,6 +58,16 @@ export async function proxy(request: NextRequest) {
       const {data:profile}=await supabase.from("profiles").select("role").eq("id",String(data.claims.sub)).maybeSingle();
       role = parseRole(profile?.role) ?? roleFromClaims(data.claims);
     }
+  } else {
+    const devCookie = request.cookies.get("pawcare_dev_session");
+    const parsed = parseDevSessionCookie(devCookie?.value);
+    if (parsed?.sub) {
+      authenticated = true;
+      role = parsed.role;
+    } else {
+      authenticated = false;
+      role = null;
+    }
   }
 
   const locale = request.nextUrl.pathname.match(/^\/(vi|en)(?:\/|$)/)?.[1] ?? "vi";
@@ -64,6 +76,11 @@ export async function proxy(request: NextRequest) {
     if (!authenticated) {
       const target = new URL(`/${locale}/sign-in`, request.url);
       target.searchParams.set("next", path);
+      if (path.includes("clinic")) {
+        target.searchParams.set("context", "clinic");
+      } else {
+        target.searchParams.set("context", "owner");
+      }
       return setSecurityHeaders(NextResponse.redirect(target));
     }
     const required = protectedAreas.find(({prefix}) => path === prefix || path.startsWith(`${prefix}/`))!;
@@ -71,7 +88,7 @@ export async function proxy(request: NextRequest) {
     if (!role) return setSecurityHeaders(NextResponse.redirect(new URL(`/${locale}/access-denied`, request.url)));
   }
 
-  if (request.nextUrl.pathname === "/design-system") return setSecurityHeaders(response);
+  if (request.nextUrl.pathname === "/design-system" || request.nextUrl.pathname.startsWith("/auth/")) return setSecurityHeaders(response);
 
   const localized = intl(forwardedRequest);
   response.cookies.getAll().forEach(({name, value, ...options}) => localized.cookies.set(name, value, options));

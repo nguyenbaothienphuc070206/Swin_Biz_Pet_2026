@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --color-background: var(--background);
@@ -24,30 +27,30 @@
 
 :root {
   color-scheme: light;
-  --background: #f7f5ef;
-  --foreground: #20332e;
-  --card: #fffdf8;
-  --card-foreground: #20332e;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
   --primary: #1e594c;
   --primary-foreground: #ffffff;
-  --secondary: #e4eee8;
-  --secondary-foreground: #254d40;
-  --muted: #edf0ea;
-  --muted-foreground: #4b6059;
+  --secondary: #e2e8f0;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
   --accent: #a9422e;
   --accent-foreground: #ffffff;
   --destructive: #a52424;
   --destructive-foreground: #ffffff;
-  --border: #d7ded6;
-  --input: #6e7b71;
+  --border: #cbd5e1;
+  --input: #475569;
   --ring: #1e594c;
   --success: #1e594c;
   --warning: #704500;
-  --warning-surface: #fff1cf;
+  --warning-surface: #fedb96;
   --info: #174f72;
-  --info-surface: #e3f1f8;
+  --info-surface: #c2e2f3;
   --sos: #a52424;
-  --sos-surface: #fff0ed;
+  --sos-surface: #fcc9c2;
   --verified: #1e594c;
   --font-body: "Be Vietnam Pro", "Segoe UI", sans-serif;
   --font-heading: "DM Sans", "Be Vietnam Pro", sans-serif;
@@ -66,37 +69,93 @@
 
 .dark {
   color-scheme: dark;
-  --background: #111b18;
-  --foreground: #e7eee9;
-  --card: #192521;
-  --card-foreground: #e7eee9;
-  --primary: #89d5b5;
-  --primary-foreground: #10231b;
-  --secondary: #273b32;
-  --secondary-foreground: #d9ece0;
-  --muted: #24312c;
-  --muted-foreground: #b4c5bc;
-  --accent: #f2a18d;
-  --accent-foreground: #32150f;
-  --destructive: #ffb4a9;
-  --destructive-foreground: #3d0807;
-  --border: #35463e;
-  --input: #738379;
-  --ring: #a0e3c5;
-  --success: #a0e3c5;
-  --warning: #ffcf7c;
-  --warning-surface: #382a14;
-  --info: #9bd8fa;
-  --info-surface: #152c3a;
-  --sos: #ffb4a9;
-  --sos-surface: #3a201d;
-  --verified: #a0e3c5;
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 18%), 0 8px 24px rgb(0 0 0 / 10%);
-  --shadow-popover: 0 18px 52px rgb(0 0 0 / 42%);
+  --background: #172026;
+  --foreground: #f1f5f9;
+  --card: #222d35;
+  --card-foreground: #f1f5f9;
+  --primary: #34d399;
+  --primary-foreground: #064e3b;
+  --secondary: #2c3943;
+  --secondary-foreground: #e2e8f0;
+  --muted: #27343e;
+  --muted-foreground: #94a3b8;
+  --accent: #fb923c;
+  --accent-foreground: #431407;
+  --destructive: #f87171;
+  --destructive-foreground: #450a0a;
+  --border: #354450;
+  --input: #475a68;
+  --ring: #34d399;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --warning-surface: #382c16;
+  --info: #38bdf8;
+  --info-surface: #193549;
+  --sos: #f87171;
+  --sos-surface: #421c1c;
+  --verified: #34d399;
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 22%), 0 10px 28px rgb(0 0 0 / 16%);
+  --shadow-popover: 0 18px 52px rgb(0 0 0 / 36%);
+}
+
+/* Clinic Portal: Calm Clinical Slate & Medical Blue Theme */
+.clinic-theme {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --primary: #0369a1;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --border: #e2e8f0;
+  --input: #64748b;
+  --ring: #0369a1;
+  --accent: #0f4c81;
+  --accent-foreground: #ffffff;
+}
+
+.dark .clinic-theme,
+.clinic-theme.dark {
+  --background: #0b121b;
+  --foreground: #f1f5f9;
+  --card: #111c2a;
+  --card-foreground: #f1f5f9;
+  --primary: #38bdf8;
+  --primary-foreground: #082f49;
+  --secondary: #1b2838;
+  --secondary-foreground: #e2e8f0;
+  --muted: #162231;
+  --muted-foreground: #94a3b8;
+  --border: #263547;
+  --input: #475569;
+  --ring: #38bdf8;
+  --accent: #60a5fa;
+  --accent-foreground: #082f49;
 }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+
+/* Font size scaling */
+html[data-font-size="sm"] { font-size: 13.5px; }
+html[data-font-size="md"] { font-size: 15px; }
+html[data-font-size="lg"] { font-size: 17px; }
+
+/* High contrast mode */
+html[data-contrast="high"] {
+  --border: #1e332c;
+  --foreground: #0a1411;
+  --card: #ffffff;
+}
+html.dark[data-contrast="high"] {
+  --border: #a0b5ab;
+  --foreground: #ffffff;
+  --card: #0b1411;
+  --background: #050b09;
+}
 body {
   margin: 0;
   background: var(--background);
@@ -143,4 +202,3 @@ button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
     transition-duration: 0.01ms !important;
   }
 }
-@import "maplibre-gl/dist/maplibre-gl.css";

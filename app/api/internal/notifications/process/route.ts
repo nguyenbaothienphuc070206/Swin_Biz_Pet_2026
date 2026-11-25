@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const adapters = [new InAppAdapter(), new WebPushAdapter(), new EmailAdapter(), new SmsZaloStubAdapter()];
     let retryableFailure = false;
     for (const adapter of adapters) {
-      if ((previous ?? []).some(row => row.channel === adapter.channel)) continue;
+      if ((previous ?? []).some((row: any) => row.channel === adapter.channel)) continue;
       const intent = { category: notification.category as keyof typeof categories, priority: notification.priority as "normal" | "high", channel: adapter.channel, scheduledAt: new Date() };
       const enabled = channels[adapter.channel];
       const optedOut = unsubscribedChannels.some(channel => channel === adapter.channel);
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       }
       const subscriptions = adapter.channel === "web_push" ? pushes ?? [] : [];
       try {
-        const targets = adapter.channel === "web_push" ? subscriptions.map(subscription => ({ subscription: { endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth_secret } } })) : [{}];
+        const targets = adapter.channel === "web_push" ? subscriptions.map((subscription: any) => ({ subscription: { endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth_secret } } })) : [{}];
         if (adapter.channel === "web_push" && targets.length === 0) {
           await db.from("notification_deliveries").insert({ notification_id: notification.id, user_id: notification.user_id, channel: adapter.channel, provider: "web-push", status: "suppressed", attempt: job.attempts, error_code: "no_active_subscription" });
           suppressed++; continue;

@@ -10,5 +10,16 @@ export function isAllowedMutationOrigin(input: {
   if (SAFE_METHODS.has(input.method.toUpperCase())) return true;
   if (NON_COOKIE_MUTATION_PATHS.has(input.pathname) || input.pathname.startsWith("/api/internal/")) return true;
   if (!input.origin || input.fetchSite === "cross-site") return false;
-  try { return new URL(input.origin).origin === new URL(input.requestOrigin).origin; } catch { return false; }
+  try {
+    const orig = new URL(input.origin).origin;
+    const reqOrig = new URL(input.requestOrigin).origin;
+    if (orig === reqOrig) return true;
+    const origHost = new URL(input.origin).hostname;
+    const reqHost = new URL(input.requestOrigin).hostname;
+    const isLocal = (h: string) => h === "localhost" || h === "127.0.0.1" || h.startsWith("192.168.") || h.startsWith("10.") || h.endsWith(".local");
+    if (isLocal(origHost) && isLocal(reqHost)) return true;
+    return false;
+  } catch {
+    return false;
+  }
 }

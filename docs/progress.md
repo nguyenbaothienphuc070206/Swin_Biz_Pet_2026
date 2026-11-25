@@ -1,5 +1,39 @@
 # Progress
 
+## 2026-11-25 — Registration-only clinic profile setup and Settings-only editing
+
+- Removed `Practice Profile` (`Hồ sơ phòng khám`) navigation items from `components/shell/clinic-shell.tsx` (`ClinicShell`) and `components/clinic/clinic-home-view.tsx` (`Practice shortcuts`), and removed all links out to `/[locale]/clinic-profile-setup` from `components/clinic/clinic-settings-view.tsx`.
+- Consolidated full clinic profile editing (license number, facility type, address, city, services, bio, reception contacts, and shift hours) directly inside Tab 1 of `components/clinic/clinic-settings-view.tsx` (`/[locale]/clinic/settings`).
+- Updated `app/actions/auth.ts` (`signUpAction`, `googleSignInAction`, `signInAction`, `devSignInAction`), `components/auth/auth-form.tsx`, and `app/[locale]/page.tsx` so new clinic registrations enter `/[locale]/clinic-profile-setup` with `pawcare_clinic_onboarding=1`, while existing or already-registered clinics are redirected from `app/[locale]/clinic-profile-setup/page.tsx` directly to `/[locale]/clinic/settings`. Removed `owner` role access to `/clinic-profile-setup` in `proxy.ts`.
+- Updated `saveClinicProfileAction` in `app/actions/clinic.ts` and `components/clinic/clinic-profile-setup-form.tsx` so completing registration sets `pawcare_clinic_registered=1`, clears `pawcare_clinic_onboarding`, and redirects directly to `/[locale]/clinic/settings?activated=1`.
+- Extended `tests/clinic-portal-e2e.spec.ts` to assert zero `clinic-profile-setup` links on clinic pages, redirect of returning clinics to `/clinic/settings`, inline profile editing persistence in Settings, and end-to-end registration-to-settings activation. Verified with `npm run typecheck`, scoped `eslint`, `npm run test:unit` (30 files, 120 tests passed), `npm run contrast` (20/20 passed), and Playwright (`tests/clinic-portal-e2e.spec.ts` & `tests/demo-core-flows.spec.ts` — 4/4 passed).
+
+## 2026-11-25 — Clinic portal isolation and dedicated Clinic Settings
+
+- Removed all clinic-to-user-portal connections across the clinics workbench (`components/shell/clinic-shell.tsx`, `components/shell/account-nav.tsx`, `components/clinic/clinic-care-plans-view.tsx`, `components/clinic/clinic-pet-records-view.tsx`, `components/clinic/patient-timeline-view.tsx`, `app/[locale]/clinics/[clinicId]/page.tsx`, and `app/[locale]/settings/security/page.tsx`).
+- Added server redirect in `app/[locale]/settings/page.tsx` so `clinic_staff` and `clinic_admin` accounts accessing `/[locale]/settings` are redirected to `/[locale]/clinic/settings`.
+- Replaced the care-plan `"Preview owner view"` external link in `components/clinic/clinic-care-plans-view.tsx` with an inline clinical detail dialog and switched patient autocomplete suggestions from `pawcare-user-pets` to `pawcare-clinic-pet-records`.
+- Replaced QR verify URLs in `components/clinic/clinic-pet-records-view.tsx` with offline clinic certificate identifiers (`PAWCARE-CLINIC-CERT:...`) and removed owner `PetShareModal` from `components/clinic/patient-timeline-view.tsx`.
+- Built `components/clinic/clinic-settings-view.tsx` and wired `/[locale]/clinic/settings` in `app/[locale]/clinic/[section]/page.tsx` + shortcut in `components/clinic/clinic-home-view.tsx` with four veterinary-specific sections (Practice & Shifts, SOS & Alerts, Clinical EMR defaults, Staff & Security/Display/Sign-out) and zero icons/emojis.
+- Verified with `npm run typecheck`, scoped `eslint`, `npm run test:unit` (30 files, 120 tests passed), `npm run contrast` (all light/dark checks passed), and Playwright (`tests/clinic-portal-e2e.spec.ts` & `tests/demo-core-flows.spec.ts` — 3 passed, 0 Axe violations, 0 console/page errors, 0 `<svg>` inside `.clinic-theme`, and 0 overflow on `360px` mobile).
+
+## 2026-11-25 — Clinic portal UI cleanup and icon removal
+
+- Refined `.clinic-theme` in `app/globals.css` to calm clinical paper surfaces (`#f8fafc` background, `#ffffff` cards, `#e2e8f0` hairline borders, `#0369a1` primary accent) and added icon-free options to `BackButton` (`hideIcon`), `ThemeToggle` (`variant="text"`), and `PetShareModal` (`hideIcons`).
+- Rebuilt `components/shell/clinic-shell.tsx` with pure typographic navigation, removing all `lucide-react` icons, emojis, icon-only sidebar collapse, and floating bottom-bar button.
+- Redesigned `clinic-home-view.tsx`, `clinic-appointments-view.tsx`, `clinic-care-plans-view.tsx`, `clinic-pet-records-view.tsx`, `clinic-profile-setup-form.tsx`, and supporting clinic views (`clinic-today-view.tsx`, `clinic-insights-view.tsx`, `patient-command-palette.tsx`, `patient-timeline-view.tsx`, `quick-vaccine-logger.tsx`, `camera-barcode-scanner.tsx`, `app/[locale]/clinic-profile-setup/page.tsx`) with zero icons or emojis, calmer clinical copy, genuine QR rendering via `qrcode`, and inline dialogs replacing browser `alert`/`prompt`/`confirm`.
+- Added `tests/clinic-portal-e2e.spec.ts` verifying zero `<svg>` icons inside `.clinic-theme`, WCAG 2.1 AA compliance in light/dark themes, core interactive flows, and 360px mobile layout across all clinic portal routes.
+
+## 2026-11-24 — Local server startup and testing verification
+
+- Resolved Turbopack root canonicalization issue in `next.config.ts` by pointing root dynamically to `process.cwd()` instead of non-existent `D:/Pet`.
+- Started and verified local Next.js development server running actively on `http://localhost:3000` (and `http://10.58.100.18:3000` on local network).
+- Verified HTTP 200 responses on key routes (`/`, `/vi`, `/en`, `/vi/demo`, `/vi/owner`, `/vi/clinics`, `/vi/pilot-kpis`, `/design-system`).
+- Ran test verification:
+  - Vitest unit tests: 30 test files, 120 tests passed (100%).
+  - TypeScript typecheck (`tsc --noEmit`): 0 errors, passed.
+  - Installed Playwright Chromium and ran `tests/demo-core-flows.spec.ts`: passed (5.4s).
+
 ## 2026-10-18 — Scenario-based demo and pilot KPI page
 
 - Added five one-click, deterministic guided demo scenarios for emergency passport transfer, 11 p.m. SOS/5 km dispatch and mock triage, vaccine catalog entry and clinic performance, vet approval of a mock AI care plan, and a verified rescue ledger.

@@ -17,7 +17,13 @@ const RuntimeSchema = z.object({
 });
 
 export function validateRuntimeEnv(env: NodeJS.ProcessEnv = process.env): void {
-  if (env.NODE_ENV !== "production" || env.NEXT_PHASE === "phase-production-build") return;
+  if (
+    env.NODE_ENV !== "production" ||
+    env.NEXT_PHASE === "phase-production-build" ||
+    env.PAWCARE_ALLOW_DEMO_RUNTIME === "1"
+  ) {
+    return;
+  }
   const result = RuntimeSchema.safeParse(env);
   if (result.success) return;
   const missing = result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");

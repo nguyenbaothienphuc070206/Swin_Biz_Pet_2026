@@ -12,3 +12,6 @@ sbom.cdx.json
 *.tsbuildinfo
 .env*
 !.env.example
+.vercel/
+
+.vercel

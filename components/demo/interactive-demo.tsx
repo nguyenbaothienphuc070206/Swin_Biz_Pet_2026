@@ -172,10 +172,101 @@ export function InteractiveDemo({ initialScenario }: { initialScenario?: DemoSce
     <div className="rounded-3xl border border-warning/30 bg-warning-surface p-4 text-sm font-semibold text-foreground" role="note">
       <div className="flex flex-wrap items-center gap-2"><Badge variant="warning">{t("fictional")}</Badge><span>{t("subtitle")}</span></div>
     </div>
+
+    {/* 3 Core Product Pillars Feature Highlight for Demo */}
+    <div className="rounded-3xl border-2 border-primary/30 bg-gradient-to-r from-primary/10 via-card to-emerald-500/10 p-5 md:p-6 space-y-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Badge variant="verified">★ LIVE DEMO SHOWCASE</Badge>
+          <h2 className="font-display text-lg font-bold text-foreground">
+            {locale === "en" ? "3 Core Product Pillars (Live Interactive)" : "3 Trụ Cột Tính Năng Trọng Tâm (Trải nghiệm tương tác)"}
+          </h2>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {/* Pillar 1 */}
+        <a
+          href={`/${locale}/owner/sos`}
+          className="group rounded-2xl border border-rose-500/30 bg-card p-4 space-y-2 hover:border-rose-500 transition shadow-2xs block"
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-xs text-rose-600 dark:text-rose-400 uppercase tracking-wide">
+              {locale === "en" ? "Pillar 1: Nearby SOS" : "Trụ cột 1: Cấp cứu 5km"}
+            </span>
+            <span className="text-[10px] rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 font-bold px-2 py-0.5">
+              1-Tap Dispatch
+            </span>
+          </div>
+          <p className="font-display text-sm font-bold text-foreground group-hover:text-rose-600 transition">
+            {locale === "en" ? "Basic Nearby-Clinic Request (< 5 km)" : "Kết nối Cấp cứu 1-Chạm Bán kính 5 km"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {locale === "en"
+              ? "1-tap dispatch connecting users to verified 24/7 hospitals within 5 km."
+              : "Quét radar & phát tín hiệu khẩn đến 3 bệnh viện 24/7 gần nhất trong 5 km."}
+          </p>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 group-hover:underline pt-1">
+            {locale === "en" ? "Open Live SOS Screen →" : "Mở màn hình SOS →"}
+          </span>
+        </a>
+
+        {/* Pillar 2 */}
+        <a
+          href={`/${locale}/owner/community`}
+          className="group rounded-2xl border border-emerald-500/30 bg-card p-4 space-y-2 hover:border-emerald-500 transition shadow-2xs block"
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-xs text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+              {locale === "en" ? "Pillar 2: Open Community" : "Trụ cột 2: Cứu hộ cộng đồng"}
+            </span>
+            <span className="text-[10px] rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5">
+              Live Geolocation
+            </span>
+          </div>
+          <p className="font-display text-sm font-bold text-foreground group-hover:text-emerald-600 transition">
+            {locale === "en" ? "Open Community Rescue Access" : "Quyền Định Vị Cứu Hộ Cộng Đồng"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {locale === "en"
+              ? "Free real-time geolocation access for rescuers & Good Samaritans."
+              : "Tọa độ GPS thời gian thực, điều phối tình nguyện viên ứng cứu cơ sở."}
+          </p>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 group-hover:underline pt-1">
+            {locale === "en" ? "Open Community Map →" : "Mở bản đồ Cứu hộ →"}
+          </span>
+        </a>
+
+        {/* Pillar 3 */}
+        <a
+          href={`/${locale}/clinic`}
+          className="group rounded-2xl border border-blue-500/30 bg-card p-4 space-y-2 hover:border-blue-500 transition shadow-2xs block"
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+              {locale === "en" ? "Pillar 3: B2B Leads" : "Trụ cột 3: B2B Viện 24/7"}
+            </span>
+            <span className="text-[10px] rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5">
+              Night Routing
+            </span>
+          </div>
+          <p className="font-display text-sm font-bold text-foreground group-hover:text-blue-600 transition">
+            {locale === "en" ? "High-Intent B2B Emergency Leads" : "Lead Cấp Cứu Ban Đêm Chuyển Đến Viện 24/7"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {locale === "en"
+              ? "Direct routing of urgent night-time cases to partner 24/7 hospitals."
+              : "Định tuyến tự động ca đêm khẩn cấp, hồ sơ y bạ số & đặt cọc buồng ICU."}
+          </p>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 group-hover:underline pt-1">
+            {locale === "en" ? "Open Clinic Command Desk →" : "Mở bàn tiếp nhận Viện →"}
+          </span>
+        </a>
+      </div>
+    </div>
     <section aria-labelledby="demo-scenarios-title" className="space-y-4 rounded-3xl border border-border bg-card p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="demo-scenarios-title" className="font-display text-xl font-bold">{t("scenarioTitle")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("scenarioIntro")}</p></div><Button variant="outline" onClick={resetDemo}>{t("resetDemo")}</Button></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="demo-scenarios-title" className="font-display text-xl font-bold">{t("scenarioTitle")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("scenarioIntro")}</p></div><div className="flex items-center gap-2">{activeScenario && <Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10" onClick={resetDemo}>✕ {locale === "en" ? "Exit Scenario" : "Thoát kịch bản"}</Button>}<Button variant="outline" onClick={resetDemo}>{t("resetDemo")}</Button></div></div>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">{DEMO_SCENARIO_IDS.map((scenario) => <Button key={scenario} variant={activeScenario === scenario ? "primary" : "outline"} className="h-auto min-h-14 justify-start whitespace-normal text-left" aria-pressed={activeScenario === scenario} onClick={() => startScenario(scenario)}>{scenarioLabels[scenario]}</Button>)}</div>
-      {activeScenario ? <p role="status" aria-live="polite" className="rounded-xl bg-secondary p-3 text-sm font-medium">{scenarioHints[activeScenario]}</p> : null}
+      {activeScenario ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-secondary p-3 text-sm font-medium"><p role="status" aria-live="polite" className="flex-1">{scenarioHints[activeScenario]}</p><Button variant="outline" size="sm" onClick={resetDemo} className="border-destructive/40 text-destructive hover:bg-destructive/10">✕ {locale === "en" ? "Exit Scenario" : "Thoát kịch bản"}</Button></div> : null}
     </section>
     <nav className="relative z-20 flex gap-2 overflow-x-auto rounded-2xl border border-border bg-background/95 p-2 backdrop-blur md:sticky md:top-2" aria-label={t("title")}>
       {["passport", "sos", "booking", "care-plans", "recommendations", "clinic"].map((id, index) => <a key={id} className="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" href={`#${id}`}>{[t("passport"), t("sos"), t("booking"), t("carePlans"), t("recommendations"), t("clinic")][index]}</a>)}
@@ -187,7 +278,7 @@ export function InteractiveDemo({ initialScenario }: { initialScenario?: DemoSce
           <div><p className="font-semibold">{t("allergies")}</p><p className="text-sm text-destructive">{demoPet.allergies.map(localizedHealthTag).join(", ")}</p></div><div><p className="font-semibold">{t("conditions")}</p><p className="text-sm">{demoPet.conditions.map(localizedHealthTag).join(", ")}</p></div>
           {activeScenario === "passport-transfer" && !grantActive ? <Button onClick={() => { setGrantActive(true); setShareUrl("/demo/share/emergency-transfer · MOCK LINK"); }}>{t("createAndShareTransfer")}</Button> : null}<div className="flex flex-wrap gap-2"><Button onClick={createShare}>{t("share")}</Button><Button variant="outline" onClick={() => { setGrantActive(false); setShareUrl(""); qrRef.current?.replaceChildren(); }}>{t("revoke")}</Button><a className="inline-flex min-h-11 items-center rounded-xl border border-border px-4 text-sm font-semibold" href={`/api/demo/passport.pdf?locale=${locale}`}>{t("exportPdf")}</a></div>
           {grantActive ? <p className="text-sm text-primary" role="status">{t("grantActive")}</p> : null}{activeScenario === "passport-transfer" && grantActive ? <div className="rounded-2xl border border-destructive/30 bg-sos-surface p-4"><p className="font-bold">{t("clinicSeesFirst")}</p><p className="mt-1 text-xs text-muted-foreground">{localizedClinicName(demoScenarioFixtures.passportTransfer.clinicName)}</p><p className="mt-2 text-sm">{t("allergies")}: {demoScenarioFixtures.passportTransfer.allergies.map(localizedHealthTag).join(", ")}</p>{demoScenarioFixtures.passportTransfer.activeMedications.map((medication) => <p key={medication.code} className="text-sm">{t("activeMedication")}: {localizedHealthTag(medication.name)} · {medication.code} · {medication.ingredient}</p>)}</div> : null}<div ref={qrRef} className="w-fit rounded-xl bg-white p-2" aria-label={t("temporaryDemoQrLabel")}/>{shareUrl ? <p className="break-all text-xs text-muted-foreground">{shareUrl}</p> : null}
-          <label className="grid gap-2 text-sm font-semibold">{t("photo")}<span className="relative"><input className="peer sr-only" type="file" accept="image/*,application/pdf" onChange={(event) => void handleLocalFile(event.target.files?.[0])}/><span className="inline-flex min-h-11 items-center rounded-xl border border-input px-4 text-sm font-semibold peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-ring">{t("chooseImage")}</span></span></label>{fileNote ? <p className="text-xs text-muted-foreground">{fileNote}</p> : null}
+          <label className="grid gap-2 text-sm font-semibold">{t("photo")}<span className="relative"><input className="peer sr-only" type="file" accept="image/*,application/pdf" onChange={(event) => void handleLocalFile(event.target.files?.[0])}/><span className="inline-flex min-h-11 items-center rounded-xl border border-input px-4 text-sm font-semibold peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-ring">{t("chooseImage")}</span></span></label>{fileNote ? <div className="flex items-center justify-between rounded-xl bg-muted p-2 text-xs text-muted-foreground"><p className="truncate mr-2">{fileNote}</p><button type="button" onClick={() => setFileNote("")} className="text-destructive font-bold hover:underline shrink-0 cursor-pointer">✕ {locale === "en" ? "Exit / Remove" : "Thoát"}</button></div> : null}
         </Card>
         <div className="space-y-4"><Card className="p-5"><h3 className="font-semibold">{t("timeline")}</h3><ol className="mt-4 space-y-3">{demoTimeline.map((record) => { const item = localizedRecord(record); return <li key={record.id} className="border-l-2 border-primary/30 pl-4"><p className="font-semibold">{item.title} · {item.date}</p><p className="text-sm text-muted-foreground">{item.detail}</p></li>; })}</ol></Card>
           <Card className="grid gap-4 p-5"><h3 className="font-semibold">{t("scan")}</h3>{activeScenario === "clinic-vaccine" ? <p role="status" className="rounded-xl bg-secondary p-3 text-sm">{t("barcodeFixtureScanned")}</p> : null}<BarcodeScanner onCode={selectBarcode} mockMode/><form className="grid gap-3 md:grid-cols-2" onSubmit={(event) => { event.preventDefault(); setRecordSaved(true); }}>
@@ -206,7 +297,7 @@ export function InteractiveDemo({ initialScenario }: { initialScenario?: DemoSce
 
     <Section id="booking" eyebrow={t("owner")} title={t("booking")}>
       <Card className="space-y-4 p-5"><div className="flex flex-wrap items-end justify-between gap-3"><label className="grid min-w-0 flex-1 gap-1 text-sm font-semibold">{t("filters")}<Input value={clinicQuery} onChange={(event) => setClinicQuery(event.target.value)} placeholder={t("districtSearch")}/></label><div className="flex gap-2"><Button variant={mapView ? "outline" : "primary"} onClick={() => setMapView(false)}>{t("list")}</Button><Button variant={mapView ? "primary" : "outline"} onClick={() => setMapView(true)}>{t("map")}</Button></div></div>
-        <div className="grid gap-4 lg:grid-cols-2">{mapView ? <div className="grid min-h-80 content-center gap-3 rounded-2xl border border-border bg-[radial-gradient(ellipse_at_center,var(--color-card),var(--color-secondary))] p-5" aria-label={t("mockMapLabel")}><p className="font-semibold">{t("mockMapTitle")}</p><p className="text-sm text-muted-foreground">{t("noExternalMapCalls")}</p>{mockMapPins.map((clinic) => <div key={clinic.id} className="flex items-center justify-between rounded-xl border border-border bg-card/90 p-3"><span className="font-medium">{localizedClinicName(clinic.name)}</span><Badge>{new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(clinic.distanceKm ?? 0)} km</Badge></div>)}</div> : clinics.length === 0 ? <Card className="p-6 text-center text-sm text-muted-foreground">{t("noClinicsFound")}</Card> : <div className="grid gap-3" role="list">{clinics.map((clinic) => <article key={clinic.id} className="rounded-2xl border border-border bg-background p-4" role="listitem"><div className="flex items-start justify-between gap-2"><div><h3 className="font-semibold">{localizedClinicName(clinic.name)}</h3><p className="text-sm text-muted-foreground">{localizedDistrict(clinic.district)} · {new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(clinic.distanceKm ?? 0)} km · {localizedServices(clinic.services).join(" · ")}</p><p className="mt-1 text-sm">{t("soonest")}: {clinic.soonestSlotHours}h · {clinic.reviewCount} {t("demoReviews")}</p></div>{clinic.verified ? <Badge variant="verified">{t("verified")}</Badge> : null}</div><Button className="mt-3" onClick={() => setAppointmentId(clinic.id)} disabled={Boolean(appointmentId)}>{t("book")}</Button></article>)}</div>}
+        <div className="grid gap-4 lg:grid-cols-2">{mapView ? <div className="grid min-h-80 content-center gap-3 rounded-2xl border border-border bg-[radial-gradient(ellipse_at_center,var(--color-card),var(--color-secondary))] p-5" aria-label={t("mockMapLabel")}><p className="font-semibold">{t("mockMapTitle")}</p><p className="text-sm text-muted-foreground">{t("noExternalMapCalls")}</p>{mockMapPins.map((clinic) => <div key={clinic.id} className="flex items-center justify-between rounded-xl border border-border bg-card/90 p-3"><span className="font-medium">{localizedClinicName(clinic.name)}</span><Badge>{new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(clinic.distanceKm ?? 0)} km</Badge></div>)}</div> : clinics.length === 0 ? <Card className="p-6 text-center text-sm text-muted-foreground">{t("noClinicsFound")}</Card> : <div className="grid gap-3" role="list">{clinics.map((clinic) => <article key={clinic.id} className="rounded-2xl border border-border bg-background p-4" role="listitem"><div className="flex items-start justify-between gap-2"><div><h3 className="font-semibold">{localizedClinicName(clinic.name)}</h3><p className="text-sm text-muted-foreground">{localizedDistrict(clinic.district)} · {new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(clinic.distanceKm ?? 0)} km · {localizedServices(clinic.services).join(" · ")}</p><p className="mt-1 text-sm">{t("soonest")}: {clinic.soonestSlotHours}h</p></div></div><Button className="mt-3" onClick={() => setAppointmentId(clinic.id)} disabled={Boolean(appointmentId)}>{t("book")}</Button></article>)}</div>}
           <div className="rounded-2xl border border-border bg-muted p-4"><h3 className="font-semibold">{t("rankingRules")}</h3><p className="mt-2 text-sm">{t("organicRankingExplanation")}</p><p className="mt-2 text-xs text-muted-foreground">{t("fictional")}</p>{appointmentId ? <p className="mt-4 font-semibold text-primary" role="status">{t("booked")}: {demoClinics.find((clinic) => clinic.id === appointmentId)?.name}<Button className="ml-2" variant="outline" onClick={() => setAppointmentId(null)}>{t("cancelBooking")}</Button></p> : null}</div>
         </div>
       </Card>

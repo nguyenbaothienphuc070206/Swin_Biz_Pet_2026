@@ -7,6 +7,16 @@ import { carePlanDraftSchema, validateCarePlanDraft, hasForbiddenMedicalInstruct
 import { recommendProducts, whyThis } from "@/modules/commerce/recommendations";
 import { calculateInvoiceTotal } from "@/modules/billing/invoice";
 import { findContraindicationWarnings } from "@/modules/passport/contraindications";
+import {
+  getBreedsForSpecies,
+  filterBreeds,
+} from "@/modules/domain/pet-breeds";
+import {
+  validatePetHealthProfile,
+  isFoodAllergyTag,
+  isDrugAllergyTag,
+  PetHealthProfileInput,
+} from "@/modules/domain/pet-health-validation";
 
 describe("Passport", () => {
   it("requires exact vaccine details and rejects an earlier due date", () => {
@@ -125,5 +135,208 @@ describe("invoices", () => {
   it("computes exact integer minor-unit totals", () => {
     expect(calculateInvoiceTotal([{ description: "Booking commission", quantity: 2, unitAmountMinor: 1250 }])).toEqual({ subtotalMinor: 2500, totalMinor: 2500 });
     expect(() => calculateInvoiceTotal([{ description: "bad", quantity: -1, unitAmountMinor: 5 }])).toThrow();
+  });
+});
+
+describe("Companion Pet Breeds & Legal Species Catalog", () => {
+  it("provides comprehensive dog breeds", () => {
+    const dogs = getBreedsForSpecies("dog");
+    expect(dogs.length).toBeGreaterThanOrEqual(20);
+    expect(dogs.some((d) => d.id === "dog-corgi")).toBe(true);
+    expect(dogs.some((d) => d.id === "dog-phuquoc")).toBe(true);
+  });
+
+  it("provides comprehensive cat breeds", () => {
+    const cats = getBreedsForSpecies("cat");
+    expect(cats.length).toBeGreaterThanOrEqual(15);
+    expect(cats.some((c) => c.id === "cat-aln")).toBe(true);
+    expect(cats.some((c) => c.id === "cat-ta")).toBe(true);
+  });
+
+  it("provides only legal companion pets for 'other' in Vietnam", () => {
+    const others = getBreedsForSpecies("other");
+    expect(others.length).toBeGreaterThanOrEqual(20);
+    // Verified legal companion animals in VN
+    expect(others.some((o) => o.id === "rabbit-minilop")).toBe(true);
+    expect(others.some((o) => o.id === "hamster-bear")).toBe(true);
+    expect(others.some((o) => o.id === "bird-budgie")).toBe(true);
+    expect(others.some((o) => o.id === "fish-betta")).toBe(true);
+    // Ensures no illegal endangered wildlife are listed
+    expect(others.some((o) => o.nameVi.toLowerCase().includes("khỉ"))).toBe(false);
+    expect(others.some((o) => o.nameVi.toLowerCase().includes("cầy hương"))).toBe(false);
+  });
+
+  it("filters breeds accent-insensitively and bi-lingually", () => {
+    const dogs = getBreedsForSpecies("dog");
+    const corgiSearch = filterBreeds(dogs, "corgi", false);
+    expect(corgiSearch.length).toBeGreaterThan(0);
+    expect(corgiSearch[0].id).toBe("dog-corgi");
+
+    const unaccentedPhuQuoc = filterBreeds(dogs, "phu quoc", false);
+    expect(unaccentedPhuQuoc.length).toBeGreaterThan(0);
+    expect(unaccentedPhuQuoc[0].id).toBe("dog-phuquoc");
+
+    const others = getBreedsForSpecies("other");
+    const hamsterSearch = filterBreeds(others, "hamster", true);
+    expect(hamsterSearch.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Pet Health Profile Validation", () => {
+  const baseValidInput: PetHealthProfileInput = {
+    name: "Milo",
+    breed: "Corgi",
+    weight: "8.5",
+    selectedTags: ["healthy"],
+    medicalHistory: "Khỏe mạnh, sinh hoạt bình thường",
+    isVaccinated: true,
+    selectedVaxes: ["Rabies vaccine"],
+    customVaxes: [],
+  };
+
+  it("validates a completely filled valid profile", () => {
+    const res = validatePetHealthProfile(baseValidInput);
+    expect(res.isValid).toBe(true);
+    expect(res.errorKey).toBeNull();
+  });
+
+  it("requires pet name and breed", () => {
+    expect(
+      validatePetHealthProfile({ ...baseValidInput, name: "   " }).errorKey
+    ).toBe("errorNameRequired");
+
+    expect(
+      validatePetHealthProfile({ ...baseValidInput, breed: "" }).errorKey
+    ).toBe("errorBreedRequired");
+  });
+
+  it("strictly requires valid weight (> 0 kg)", () => {
+    expect(
+      validatePetHealthProfile({ ...baseValidInput, weight: "" }).errorKey
+    ).toBe("errorWeightRequired");
+
+    expect(
+      validatePetHealthProfile({ ...baseValidInput, weight: "0" }).errorKey
+    ).toBe("errorWeightRequired");
+
+    expect(
+      validatePetHealthProfile({ ...baseValidInput, weight: "-3.5" }).errorKey
+    ).toBe("errorWeightRequired");
+
+    expect(
+      validatePetHealthProfile({ ...baseValidInput, weight: "abc" }).errorKey
+    ).toBe("errorWeightRequired");
+
+    expect(
+      validatePetHealthProfile({ ...baseValidInput, weight: 4.5 }).isValid
+    ).toBe(true);
+  });
+
+  it("requires medical condition information or history notes", () => {
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        selectedTags: [],
+        medicalHistory: "   ",
+      }).errorKey
+    ).toBe("errorMedicalRequired");
+
+    // Valid when either tags or written history is provided
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        selectedTags: ["Khỏe mạnh"],
+        medicalHistory: "",
+      }).isValid
+    ).toBe(true);
+
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        selectedTags: [],
+        medicalHistory: "Từng bị viêm da năm ngoái",
+      }).isValid
+    ).toBe(true);
+  });
+
+  it("strictly requires details when food allergy or drug allergy is selected", () => {
+    // Food allergy without detail
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        selectedTags: ["Dị ứng thức ăn"],
+        foodAllergyDetails: "  ",
+      }).errorKey
+    ).toBe("errorFoodAllergyRequired");
+
+    // Food allergy with detail passes
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        selectedTags: ["Dị ứng thức ăn"],
+        foodAllergyDetails: "Thịt gà, hải sản",
+      }).isValid
+    ).toBe(true);
+
+    // Drug allergy without detail
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        selectedTags: ["Dị ứng thuốc"],
+        drugAllergyDetails: "",
+      }).errorKey
+    ).toBe("errorDrugAllergyRequired");
+
+    // Drug allergy with detail passes
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        selectedTags: ["Dị ứng thuốc"],
+        drugAllergyDetails: "Penicillin",
+      }).isValid
+    ).toBe(true);
+  });
+
+  it("strictly requires at least 1 vaccination record", () => {
+    // isVaccinated = false
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        isVaccinated: false,
+        selectedVaxes: [],
+      }).errorKey
+    ).toBe("errorVaccineRequired");
+
+    // isVaccinated = true but no vaccines selected
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        isVaccinated: true,
+        selectedVaxes: [],
+        customVaxes: [],
+      }).errorKey
+    ).toBe("errorVaccineRequired");
+
+    // Custom vaccine alone fulfills the requirement
+    expect(
+      validatePetHealthProfile({
+        ...baseValidInput,
+        isVaccinated: true,
+        selectedVaxes: [],
+        customVaxes: [{ id: "cv1", name: "Vắc-xin 7 bệnh" }],
+      }).isValid
+    ).toBe(true);
+  });
+
+  it("identifies food and drug allergy tags correctly across locales", () => {
+    expect(isFoodAllergyTag("food_allergy")).toBe(true);
+    expect(isFoodAllergyTag("Dị ứng thức ăn")).toBe(true);
+    expect(isFoodAllergyTag("Food allergies")).toBe(true);
+    expect(isFoodAllergyTag("healthy")).toBe(false);
+
+    expect(isDrugAllergyTag("drug_allergy")).toBe(true);
+    expect(isDrugAllergyTag("Dị ứng thuốc")).toBe(true);
+    expect(isDrugAllergyTag("Drug/vaccine allergies")).toBe(true);
+    expect(isDrugAllergyTag("surgery")).toBe(false);
   });
 });

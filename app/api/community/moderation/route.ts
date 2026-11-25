@@ -17,7 +17,7 @@ export async function GET() {
   const rows = await Promise.all(tables.map(async (table) => {
     const { data, error } = await supabase.from(table.table).select(table.select).eq("status", "pending").order("created_at", { ascending: true }).limit(100);
     if(error)return [];
-    return Promise.all((data??[]).map(async row=>{const value=row as unknown as Record<string,unknown>;let imageUrl:string|null=null;const imagePath=value.image_path;if(typeof imagePath==="string"){const {data:signed}=await supabase.storage.from("community-private").createSignedUrl(imagePath,privateSignedUrlExpiry(300));imageUrl=signed?.signedUrl??null}return {...value,imageUrl,type:table.type}}));
+    return Promise.all((data??[]).map(async (row: any)=>{const value=row as unknown as Record<string,unknown>;let imageUrl:string|null=null;const imagePath=value.image_path;if(typeof imagePath==="string"){const {data:signed}=await supabase.storage.from("community-private").createSignedUrl(imagePath,privateSignedUrlExpiry(300));imageUrl=signed?.signedUrl??null}return {...value,imageUrl,type:table.type}}));
   }));
   const [reports,appeals]=await Promise.all([
     supabase.from("community_moderation_reports").select("id,target_type,target_id,reason,status,created_at").eq("status","open").order("created_at",{ascending:true}).limit(100),

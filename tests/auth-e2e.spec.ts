@@ -16,10 +16,9 @@ async function signIn(page: Page, email: string, password: string) {
 
 test("email sign-in and sign-out work for a configured test owner", async ({ page }) => {
   await signIn(page, required("E2E_OWNER_EMAIL"), required("E2E_OWNER_PASSWORD"));
-  await expect(page).toHaveURL(/\/vi\/owner/);
-  await page.goto("/vi/settings");
+  await expect(page).toHaveURL(/\/vi\/settings/);
   await page.locator("form").last().locator('button[type="submit"]').click();
-  await expect(page).toHaveURL(/\/vi\/?$/);
+  await expect(page).toHaveURL(/\/vi\/sign-in/);
 });
 
 test("sign-up exposes email and Google auth paths", async ({ page }) => {

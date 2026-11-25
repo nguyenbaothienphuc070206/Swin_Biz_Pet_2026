@@ -29,3 +29,21 @@ export function rankClinics<T extends ClinicCandidate>(clinics: T[], radiusKm: n
     return { ...clinic, score: Math.round(score * 100) / 100, parts };
   }).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
 }
+
+export type RatedFacility = {
+  id: string;
+  rating: number;
+  reviewCount: number;
+  distanceKm?: number | null;
+};
+
+export function rankByRating<T extends RatedFacility>(facilities: T[]): T[] {
+  return [...facilities].sort((a, b) => {
+    if (b.rating !== a.rating) return b.rating - a.rating;
+    if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount;
+    const distA = a.distanceKm ?? 999;
+    const distB = b.distanceKm ?? 999;
+    if (distA !== distB) return distA - distB;
+    return a.id.localeCompare(b.id);
+  });
+}

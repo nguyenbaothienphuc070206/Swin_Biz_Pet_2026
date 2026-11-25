@@ -1,14 +1,54 @@
 "use client";
-import {useLocale} from "next-intl";
-import {usePathname} from "next/navigation";
-import {useTranslations} from "next-intl";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useLocale } from "next-intl";
+import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 export function LocaleSwitcher() {
   const locale = useLocale();
   const pathname = usePathname();
   const t = useTranslations("common");
   const path = pathname.replace(/^\/(vi|en)(?=\/|$)/, "");
-  return <nav aria-label={t("language")} className="flex gap-1 text-sm">
-    {(["vi", "en"] as const).map((code) => <a key={code} lang={code} href={`/${code}${path}`} aria-current={locale === code ? "page" : undefined} className={`rounded-full px-3 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${locale === code ? "bg-secondary font-semibold" : "text-muted-foreground hover:bg-secondary/60"}`}>{code.toUpperCase()}</a>)}
-  </nav>;
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSearch(window.location.search);
+    }
+  }, [pathname]);
+
+  const handleSwitch = (code: string) => {
+    if (typeof document !== "undefined") {
+      document.cookie = `NEXT_LOCALE=${code}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+  };
+
+  return (
+    <nav
+      aria-label={t("language")}
+      className="inline-flex items-center gap-1 rounded-full border border-slate-300 dark:border-slate-700 bg-card p-0.5 sm:p-1 shadow-xs shrink-0"
+    >
+      {(["vi", "en"] as const).map((code) => {
+        const href = `/${code}${path}${search}`;
+        const isCurrent = locale === code;
+        return (
+          <Link
+            key={code}
+            lang={code}
+            href={href}
+            onClick={() => handleSwitch(code)}
+            aria-current={isCurrent ? "page" : undefined}
+            className={`rounded-full px-2.5 py-1 text-xs font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
+              isCurrent
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-slate-600 dark:text-slate-300 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+            }`}
+          >
+            {code.toUpperCase()}
+          </Link>
+        );
+      })}
+    </nav>
+  );
 }

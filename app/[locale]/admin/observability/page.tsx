@@ -17,39 +17,92 @@ export default async function ObservabilityPage({params}:{params:Promise<{locale
     supabase.from("appointments").select("clinic_id,status,created_at").eq("is_demo",false).gte("created_at",cohortSince).limit(10000),
     supabase.from("sos_requests").select("accepted_clinic_id,created_at,accepted_at,status").gte("created_at",cohortSince).not("accepted_clinic_id","is",null).limit(10000),
   ]);
-  const requests=sosResult.data??[];const ids=requests.map(row=>row.id);
-  const dispatchResult=ids.length?await supabase.from("sos_dispatches").select("request_id,pinged_at").in("request_id",ids):{data:[],error:null};
-  const firstPing=new Map<string,string>();for(const dispatch of dispatchResult.data??[]){const prior=firstPing.get(dispatch.request_id);if(!prior||dispatch.pinged_at<prior)firstPing.set(dispatch.request_id,dispatch.pinged_at);}
-  const metrics=evaluateOperationalMetrics({sos:requests.map(row=>({createdAt:row.created_at,firstPingAt:firstPing.get(row.id)??null,status:row.status})),aiOutcomes:(aiResult.data??[]).map(row=>row.outcome)});
-  const owners=ownerCohortResult.data??[],ownerIds=owners.map(row=>row.id);
-  const petResult=ownerIds.length?await supabase.from("pets").select("id,owner_id,created_at").in("owner_id",ownerIds).is("deleted_at",null).eq("is_demo",false).limit(10000):{data:[],error:null};
-  const pets=petResult.data??[],petIds=pets.map(row=>row.id);
-  const [recordsResult,vaccinesResult,retentionBookingsResult]=await Promise.all([
-    petIds.length?supabase.from("medical_records").select("pet_id,created_at").in("pet_id",petIds).eq("is_demo",false).gte("created_at",cohortSince).limit(10000):Promise.resolve({data:[],error:null}),
-    petIds.length?supabase.from("vaccinations").select("pet_id,created_at").in("pet_id",petIds).eq("is_demo",false).gte("created_at",cohortSince).limit(10000):Promise.resolve({data:[],error:null}),
-    (ownerCohortResult.data??[]).filter(row=>row.created_at<cohortBefore).length?supabase.from("appointments").select("owner_id").in("owner_id",(ownerCohortResult.data??[]).filter(row=>row.created_at<cohortBefore).map(row=>row.id)).eq("status","completed").gte("created_at",since).limit(10000):Promise.resolve({data:[],error:null}),
+  const requests = (sosResult.data ?? []) as any[];
+  const ids = requests.map((row: any) => row.id);
+  const dispatchResult = ids.length ? await supabase.from("sos_dispatches").select("request_id,pinged_at").in("request_id", ids) : { data: [], error: null };
+  const firstPing = new Map<string, string>();
+  for (const dispatch of (dispatchResult.data ?? []) as any[]) {
+    const prior = firstPing.get(dispatch.request_id);
+    if (!prior || dispatch.pinged_at < prior) firstPing.set(dispatch.request_id, dispatch.pinged_at);
+  }
+  const metrics = evaluateOperationalMetrics({
+    sos: requests.map((row: any) => ({ createdAt: row.created_at, firstPingAt: firstPing.get(row.id) ?? null, status: row.status })),
+    aiOutcomes: ((aiResult.data ?? []) as any[]).map((row: any) => row.outcome),
+  });
+  const owners = (ownerCohortResult.data ?? []) as any[];
+  const ownerIds = owners.map((row: any) => row.id);
+  const petResult = ownerIds.length ? await supabase.from("pets").select("id,owner_id,created_at").in("owner_id", ownerIds).is("deleted_at", null).eq("is_demo", false).limit(10000) : { data: [], error: null };
+  const pets = (petResult.data ?? []) as any[];
+  const petIds = pets.map((row: any) => row.id);
+  const [recordsResult, vaccinesResult, retentionBookingsResult] = await Promise.all([
+    petIds.length ? supabase.from("medical_records").select("pet_id,created_at").in("pet_id", petIds).eq("is_demo", false).gte("created_at", cohortSince).limit(10000) : Promise.resolve({ data: [], error: null }),
+    petIds.length ? supabase.from("vaccinations").select("pet_id,created_at").in("pet_id", petIds).eq("is_demo", false).gte("created_at", cohortSince).limit(10000) : Promise.resolve({ data: [], error: null }),
+    ((ownerCohortResult.data ?? []) as any[]).filter((row: any) => row.created_at < cohortBefore).length ? supabase.from("appointments").select("owner_id").in("owner_id", ((ownerCohortResult.data ?? []) as any[]).filter((row: any) => row.created_at < cohortBefore).map((row: any) => row.id)).eq("status", "completed").gte("created_at", since).limit(10000) : Promise.resolve({ data: [], error: null }),
   ]);
-  const activationOwners=owners.filter(row=>row.created_at>=new Date(now-30*86_400_000).toISOString());
-  const petEligibleOwners=activationOwners.filter(row=>row.created_at<new Date(now-7*86_400_000).toISOString());
-  const recordEligibleOwners=activationOwners.filter(row=>row.created_at<new Date(now-14*86_400_000).toISOString());
-  const petEligibleSet=new Set(petEligibleOwners.map(row=>row.id)),recordEligibleSet=new Set(recordEligibleOwners.map(row=>row.id));
-  const ownerCreatedAt=new Map(owners.map(row=>[row.id,new Date(row.created_at).getTime()]));
-  const petOwners=new Set(pets.filter(row=>{const created=ownerCreatedAt.get(row.owner_id),petCreated=new Date(row.created_at).getTime();return created!==undefined&&petEligibleSet.has(row.owner_id)&&petCreated>=created&&petCreated-created<=7*86_400_000;}).map(row=>row.owner_id));
-  const petToOwner=new Map(pets.map(row=>[row.id,row.owner_id]));
-  const isFirstRecord=(petId:string,createdAt:string)=>{const ownerId=petToOwner.get(petId),created=ownerId?ownerCreatedAt.get(ownerId):undefined,recorded=new Date(createdAt).getTime();return Boolean(ownerId&&recordEligibleSet.has(ownerId)&&created!==undefined&&recorded>=created&&recorded-created<=14*86_400_000);};
-  const recordPetIds=new Set([
-    ...(recordsResult.data??[]).filter(row=>isFirstRecord(row.pet_id,row.created_at)).map(row=>row.pet_id),
-    ...(vaccinesResult.data??[]).filter(row=>isFirstRecord(row.pet_id,row.created_at)).map(row=>row.pet_id),
+  const activationOwners = owners.filter((row: any) => row.created_at >= new Date(now - 30 * 86_400_000).toISOString());
+  const petEligibleOwners = activationOwners.filter((row: any) => row.created_at < new Date(now - 7 * 86_400_000).toISOString());
+  const recordEligibleOwners = activationOwners.filter((row: any) => row.created_at < new Date(now - 14 * 86_400_000).toISOString());
+  const petEligibleSet = new Set(petEligibleOwners.map((row: any) => row.id));
+  const recordEligibleSet = new Set(recordEligibleOwners.map((row: any) => row.id));
+  const ownerCreatedAt = new Map<string, number>();
+  for (const row of owners) {
+    ownerCreatedAt.set(row.id, new Date(row.created_at).getTime());
+  }
+  const petOwners = new Set(
+    pets
+      .filter((row: any) => {
+        const created = ownerCreatedAt.get(row.owner_id);
+        const petCreated = new Date(row.created_at).getTime();
+        return created !== undefined && petEligibleSet.has(row.owner_id) && petCreated >= created && petCreated - created <= 7 * 86_400_000;
+      })
+      .map((row: any) => row.owner_id)
+  );
+  const petToOwner = new Map<string, string>();
+  for (const row of pets) {
+    petToOwner.set(row.id, row.owner_id);
+  }
+  const isFirstRecord = (petId: string, createdAt: string) => {
+    const ownerId = petToOwner.get(petId);
+    const created = ownerId ? ownerCreatedAt.get(ownerId) : undefined;
+    const recorded = new Date(createdAt).getTime();
+    return Boolean(ownerId && recordEligibleSet.has(ownerId) && created !== undefined && recorded >= created && recorded - created <= 14 * 86_400_000);
+  };
+  const recordPetIds = new Set([
+    ...((recordsResult.data ?? []) as any[]).filter((row: any) => isFirstRecord(row.pet_id, row.created_at)).map((row: any) => row.pet_id),
+    ...((vaccinesResult.data ?? []) as any[]).filter((row: any) => isFirstRecord(row.pet_id, row.created_at)).map((row: any) => row.pet_id),
   ]);
-  const ownersWithRecord=new Set([...recordPetIds].map(petId=>petToOwner.get(petId)).filter((id):id is string=>Boolean(id)&&recordEligibleSet.has(id)));
-  const appointments=appointmentsResult.data??[],bookingConfirmed=appointments.filter(row=>row.status==="confirmed"||row.status==="completed").length,bookingCompleted=appointments.filter(row=>row.status==="completed").length;
-  const acceptedRequests=requests.filter(row=>row.status==="accepted"||row.status==="in_progress"||row.status==="completed");
-  const sessionResult=acceptedRequests.length?await supabase.from("triage_sessions").select("request_id").in("request_id",acceptedRequests.map(row=>row.id)): {data:[],error:null};
-  const sosActivationRequests=new Set((dispatchResult.data??[]).map(row=>row.request_id));
-  const oldOwnerIds=owners.filter(row=>row.created_at<cohortBefore).map(row=>row.id);const oldOwnerSet=new Set(oldOwnerIds);const retainedOwners=new Set([...(retentionBookingsResult.data??[]).map(row=>row.owner_id),...requests.filter(row=>row.status==="accepted"||row.status==="in_progress"||row.status==="completed").map(row=>row.owner_id)].filter(ownerId=>oldOwnerSet.has(ownerId)));
-  const eligibleClinics=(clinicCohortResult.data??[]).filter(row=>new Date(row.created_at).getTime()<=now-30*86_400_000),clinicById=new Map(eligibleClinics.map(row=>[row.id,row])),activeClinicIds=new Set<string>();
-  for(const appointment of clinicAppointmentsResult.data??[]){const clinic=clinicById.get(appointment.clinic_id),created=clinic?new Date(clinic.created_at).getTime():undefined,activity=new Date(appointment.created_at).getTime();if(clinic?.verified&&appointment.status==="completed"&&created!==undefined&&activity>=created&&activity<=created+30*86_400_000)activeClinicIds.add(appointment.clinic_id);}
-  for(const sos of clinicSosResult.data??[]){const clinicId=sos.accepted_clinic_id,clinic=clinicId?clinicById.get(clinicId):undefined,created=clinic?new Date(clinic.created_at).getTime():undefined,activity=sos.accepted_at?new Date(sos.accepted_at).getTime():NaN;if(clinic?.verified&&created!==undefined&&Number.isFinite(activity)&&activity>=created&&activity<=created+30*86_400_000)activeClinicIds.add(clinic.id);}
+  const ownersWithRecord = new Set([...recordPetIds].map((petId: string) => petToOwner.get(petId)).filter((id): id is string => Boolean(id) && recordEligibleSet.has(id)));
+  const appointments = (appointmentsResult.data ?? []) as any[];
+  const bookingConfirmed = appointments.filter((row: any) => row.status === "confirmed" || row.status === "completed").length;
+  const bookingCompleted = appointments.filter((row: any) => row.status === "completed").length;
+  const acceptedRequests = requests.filter((row: any) => row.status === "accepted" || row.status === "in_progress" || row.status === "completed");
+  const sessionResult = acceptedRequests.length ? await supabase.from("triage_sessions").select("request_id").in("request_id", acceptedRequests.map((row: any) => row.id)) : { data: [], error: null };
+  const sosActivationRequests = new Set(((dispatchResult.data ?? []) as any[]).map((row: any) => row.request_id));
+  const oldOwnerIds = owners.filter((row: any) => row.created_at < cohortBefore).map((row: any) => row.id);
+  const oldOwnerSet = new Set(oldOwnerIds);
+  const retainedOwners = new Set([
+    ...((retentionBookingsResult.data ?? []) as any[]).map((row: any) => row.owner_id),
+    ...requests.filter((row: any) => row.status === "accepted" || row.status === "in_progress" || row.status === "completed").map((row: any) => row.owner_id),
+  ].filter((ownerId: string) => oldOwnerSet.has(ownerId)));
+  const eligibleClinics = ((clinicCohortResult.data ?? []) as any[]).filter((row: any) => new Date(row.created_at).getTime() <= now - 30 * 86_400_000);
+  const clinicById = new Map<string, any>();
+  for (const row of eligibleClinics) {
+    clinicById.set(row.id, row);
+  }
+  const activeClinicIds = new Set<string>();
+  for (const appointment of (clinicAppointmentsResult.data ?? []) as any[]) {
+    const clinic = clinicById.get(appointment.clinic_id);
+    const created = clinic ? new Date(clinic.created_at).getTime() : undefined;
+    const activity = new Date(appointment.created_at).getTime();
+    if (clinic?.verified && appointment.status === "completed" && created !== undefined && activity >= created && activity <= created + 30 * 86_400_000) activeClinicIds.add(appointment.clinic_id);
+  }
+  for (const sos of (clinicSosResult.data ?? []) as any[]) {
+    const clinicId = sos.accepted_clinic_id;
+    const clinic = clinicId ? clinicById.get(clinicId) : undefined;
+    const created = clinic ? new Date(clinic.created_at).getTime() : undefined;
+    const activity = sos.accepted_at ? new Date(sos.accepted_at).getTime() : NaN;
+    if (clinic?.verified && created !== undefined && Number.isFinite(activity) && activity >= created && activity <= created + 30 * 86_400_000) activeClinicIds.add(clinic.id);
+  }
   const productMetrics={firstPetEligible:petEligibleOwners.length,firstRecordEligible:recordEligibleOwners.length,firstPet:petOwners.size,firstRecord:ownersWithRecord.size,bookingConfirmed,bookingCompleted,bookingTotal:appointments.length,sosSubmitted:requests.length,sosPinged:sosActivationRequests.size,sosAccepted:acceptedRequests.length,sosSessions:(sessionResult.data??[]).length,retentionEligible:oldOwnerIds.length,retained:retainedOwners.size,clinicEligible:eligibleClinics.length,clinicActivated:activeClinicIds.size};
   const firstPetValue=productMetrics.firstPetEligible>=10?`${productMetrics.firstPet}/${productMetrics.firstPetEligible}`:t("notAvailable");
   const firstRecordValue=productMetrics.firstRecordEligible>=10?`${productMetrics.firstRecord}/${productMetrics.firstRecordEligible}`:t("notAvailable");
