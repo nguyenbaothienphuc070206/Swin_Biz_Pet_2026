@@ -45,6 +45,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { BackButton } from "@/components/ui/back-button";
 import { signOutAction } from "@/app/actions/auth";
+import { PortalSyncBridge } from "@/components/shell/portal-sync-bridge";
 
 interface PersonalSettingsProps {
   initialProfile?: {
@@ -140,11 +141,7 @@ export function PersonalSettingsView({
     try {
       if (typeof window !== "undefined") {
         try {
-          localStorage.removeItem("pawcare-user-pets");
-          localStorage.removeItem("pawcare-appointments");
-          localStorage.removeItem("pawcare-care-plans");
-          localStorage.removeItem("pawcare_active_pet_id");
-          localStorage.removeItem("pawcare_subscription_plan");
+          localStorage.removeItem("pawcare_synced_owner_id");
         } catch {}
       }
       await fetch(`/api/auth/sign-out?locale=${locale}`, { method: "POST" }).catch(() => {});
@@ -1528,6 +1525,7 @@ export function PersonalSettingsView({
           </button>
         </form>
       </Card>
+      <PortalSyncBridge role="owner" />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { SubscriptionManager } from "@/components/billing/subscription-manager";
 import { effectivePlan } from "@/modules/billing/entitlements";
 import { BackButton } from "@/components/ui/back-button";
+import { resolveOwnerAccount } from "@/lib/portal-store/server-store";
 
 const defaultBillingPlans: { code: "free" | "premium"; amount_vnd: number | null }[] = [
   { code: "free", amount_vnd: null },
@@ -58,17 +59,19 @@ export default async function BillingPage({
     ["free", "premium"].includes(p.code as any)
   );
 
-  const currentPlan = effectivePlan(
-    subscription
-      ? {
-          plan: (subscription.plan_code ?? "free") as "free" | "plus" | "premium",
-          pendingPlan: (subscription.pending_plan_code ?? null) as "free" | "plus" | "premium" | null,
-          status: subscription.status as "active" | "past_due" | "cancelled" | "expired",
-          periodEndsAt: new Date(subscription.period_ends_at).getTime(),
-          graceEndsAt: subscription.grace_ends_at ? new Date(subscription.grace_ends_at).getTime() : null,
-        }
-      : null
-  );
+  const fallbackOwnerPlan = !isSupabaseConfigured()
+    ? resolveOwnerAccount(userId).plan
+    : "free";
+
+  const currentPlan = subscription
+    ? effectivePlan({
+        plan: (subscription.plan_code ?? "free") as "free" | "plus" | "premium",
+        pendingPlan: (subscription.pending_plan_code ?? null) as "free" | "plus" | "premium" | null,
+        status: subscription.status as "active" | "past_due" | "cancelled" | "expired",
+        periodEndsAt: new Date(subscription.period_ends_at).getTime(),
+        graceEndsAt: subscription.grace_ends_at ? new Date(subscription.grace_ends_at).getTime() : null,
+      })
+    : fallbackOwnerPlan;
 
   return (
     <div className="grid gap-6">

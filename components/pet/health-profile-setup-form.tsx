@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { ensureOwnerSessionAction } from "@/app/actions/owner";
+import { PortalSyncBridge } from "@/components/shell/portal-sync-bridge";
 import {
   PawPrint,
   CheckCircle2,
@@ -1436,6 +1437,7 @@ export function HealthProfileSetupForm({
           )}
         </button>
       </div>
+      <PortalSyncBridge role="owner" />
     </form>
   );
 }

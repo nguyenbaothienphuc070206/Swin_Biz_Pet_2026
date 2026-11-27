@@ -5,6 +5,7 @@ import { OwnerHomeView } from "@/components/owner/owner-home-view";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { effectivePlan } from "@/modules/billing/entitlements";
+import { resolveOwnerAccount } from "@/lib/portal-store/server-store";
 
 export async function generateMetadata({
   params,
@@ -33,9 +34,15 @@ export default async function OwnerHome({
   await requireRole(["owner"], locale as "vi" | "en");
   const user = await getOptionalUser();
 
-  const userName = user?.name || (locale === "en" ? "Pet Parent" : "Chủ nuôi");
+  const ownerAcc = !isSupabaseConfigured()
+    ? resolveOwnerAccount(user?.email || user?.id)
+    : null;
+  const userName =
+    ownerAcc?.profile.fullName ||
+    user?.name ||
+    (locale === "en" ? "Pet Parent" : "Chủ nuôi");
 
-  let initialPlan: "free" | "premium" = "free";
+  let initialPlan: "free" | "premium" = ownerAcc?.plan ?? "premium";
   if (isSupabaseConfigured() && process.env.SUPABASE_SERVICE_ROLE_KEY && user?.id) {
     try {
       const db = createServiceClient();

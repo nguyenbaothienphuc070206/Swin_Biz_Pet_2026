@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-27 — Unified 2-Portal Backend Persistence & 4 Paired Premium Owner Accounts
+
+- Built unified backend repository `lib/portal-store/server-store.ts` with atomic file persistence (`.pawcare-data/portal-store.json` locally and `/tmp/pawcare-data/portal-store.json` + `globalThis` in serverless) and bidirectional data projection between Owner Portal (`OwnerPetRecord`) and Clinic Portal (`PetRecordData`).
+- Provisioned 4 paired **Premium** Owner accounts (`yen.le@pawcare.vn` · Bé Bơ, `khoa.tran@pawcare.vn` · Bé Mochi, `duc.pham@pawcare.vn` · Bé Lu, `trang.nguyen@pawcare.vn` · Bé Miu Miu, plus aliases `owner1@pawcare.vn`..`owner4@pawcare.vn` & `owner@pawcare.vn`) paired directly with the Clinic account (`clinic@pawcare.vn` · Phòng Khám Thú Y PetCare · Quận 1).
+- Added `/api/portal/state` (`GET` scoped state, `POST` Zod-validated mutations & storage sync, `PUT` 1-click account switching) and connected `app/actions/auth.ts`, `app/actions/clinic.ts`, `lib/supabase/mock.ts`, `modules/passport/mock-share-store.ts`, `app/[locale]/owner/page.tsx`, `app/[locale]/owner/billing/page.tsx`, `/api/passport/[petId]/export`, and `/api/passport/verify/[token]`.
+- Added client-backend bi-directional sync bridge `components/shell/portal-sync-bridge.tsx` mounted in `OwnerShell`, `ClinicShell`, `PersonalSettingsView`, and `HealthProfileSetupForm`, plus a 4-Premium-Account switcher card in `components/owner/owner-home-view.tsx` and non-destructive sign-out so user data is never lost.
+- Added unit tests in `lib/portal-store/server-store.test.ts` verifying the 4 Premium accounts, bidirectional Owner <-> Clinic pet/vaccine/weight/appointment/care-plan sync, and persistence.
+
 ## 2026-11-25 — GitHub push and Vercel production deployment (`pawcare`)
 
 - Added explicit opt-in `PAWCARE_ALLOW_DEMO_RUNTIME=1` bypass in `lib/env.ts` (and documented `PAWCARE_ALLOW_DEMO_RUNTIME=0` default in `.env.example`) so demo deployments without live Supabase credentials boot cleanly while production remains fail-closed by default.

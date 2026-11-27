@@ -38,6 +38,7 @@ import { signOutAction } from "@/app/actions/auth";
 import { ThemeToggle } from "./theme-toggle";
 import { LocaleSwitcher } from "./locale-switcher";
 import { useOwnerPlan } from "@/lib/hooks/use-owner-plan";
+import { PortalSyncBridge } from "./portal-sync-bridge";
 
 interface ShellReminderItem {
   id: string;
@@ -302,11 +303,7 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
     try {
       if (typeof window !== "undefined") {
         try {
-          localStorage.removeItem("pawcare-user-pets");
-          localStorage.removeItem("pawcare-appointments");
-          localStorage.removeItem("pawcare-care-plans");
-          localStorage.removeItem("pawcare_active_pet_id");
-          localStorage.removeItem("pawcare_subscription_plan");
+          localStorage.removeItem("pawcare_synced_owner_id");
         } catch {}
       }
       await fetch(`/api/auth/sign-out?locale=${locale}`, {
@@ -1152,6 +1149,7 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
         })()}
       </nav>
       )}
+      <PortalSyncBridge role="owner" />
     </div>
   );
 }

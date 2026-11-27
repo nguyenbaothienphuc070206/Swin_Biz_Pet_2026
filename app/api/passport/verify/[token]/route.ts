@@ -13,6 +13,7 @@ import {
   findMockGrantByTokenOrHash,
   logMockShareAccess,
 } from "@/modules/passport/mock-share-store";
+import { getPortalDatabase } from "@/lib/portal-store/server-store";
 
 // Simple in-memory rate limiter for PIN brute-force prevention
 const failedPinAttempts = new Map<string, { count: number; lockedUntil: number }>();
@@ -251,40 +252,83 @@ export async function POST(
     coarseLocation: "TP. Hồ Chí Minh",
   });
 
-  const samplePet = {
-    id: mockGrant.petId,
-    name: "Mochi",
-    species: "dog",
-    breed: "Corgi Wales Pembroke",
-    gender: "male",
-    birthDate: "2022-03-15",
-    weightKg: 11.5,
-    microchip: "982000412345678",
-    vaccinations: [
-      {
-        name: "Vắc-xin phòng dại Rabisin",
-        date: "2026-05-10",
-        nextDue: "2027-05-10",
-        lot: "RAB-2026-09",
-        clinic: "Phòng khám Thú y Bác Sĩ Tâm · Quận 3",
-      },
-      {
-        name: "Vanguard Plus 5/CV-L (Phòng 7 bệnh)",
-        date: "2026-05-10",
-        nextDue: "2027-05-10",
-        lot: "VG-2026-44",
-        clinic: "Phòng khám Thú y Bác Sĩ Tâm · Quận 3",
-      },
-    ],
-    medications: [
-      { name: "NexGard Spectra 7.5 - 15kg", dose: "1 viên", instructions: "Uống phòng ve rận & giun tim" },
-    ],
-    allergies: [{ name: "Dị ứng đạm bò", severity: "trung bình" }],
-    conditions: [{ name: "Viêm da dị ứng nhẹ", status: "đang kiểm soát" }],
-    ownerContact: mockGrant.includeOwnerContact
-      ? { name: "Nguyễn Văn An", phone: "0908 123 456", district: "Quận 3, TP.HCM" }
-      : undefined,
-  };
+  const portalDb = getPortalDatabase();
+  const storedClinicPet = portalDb.clinicPetRecords[mockGrant.petId];
+
+  const samplePet = storedClinicPet
+    ? {
+        id: storedClinicPet.id,
+        name: storedClinicPet.name,
+        species: storedClinicPet.species,
+        breed: storedClinicPet.breed,
+        gender: storedClinicPet.gender,
+        birthDate: storedClinicPet.birthDate,
+        weightKg: storedClinicPet.weightKg,
+        microchip: storedClinicPet.microchip,
+        vaccinations: (storedClinicPet.vaccinations || []).map((v) => ({
+          name: v.name,
+          date: v.adminDate,
+          nextDue: v.nextDue,
+          lot: v.batchNo,
+          clinic: v.clinic,
+        })),
+        medications: (storedClinicPet.encounters || []).flatMap((enc) =>
+          (enc.prescriptions || []).map((rx) => ({
+            name: rx.medication,
+            dose: rx.dosage,
+            instructions: rx.instructions || `${rx.frequency} (${rx.duration})`,
+          }))
+        ),
+        allergies: (storedClinicPet.allergies || []).map((a) => ({
+          name: a,
+          severity: "trung bình",
+        })),
+        conditions: (storedClinicPet.conditions || []).map((c) => ({
+          name: c,
+          status: "đang kiểm soát",
+        })),
+        ownerContact: mockGrant.includeOwnerContact
+          ? {
+              name: storedClinicPet.owner.name,
+              phone: storedClinicPet.owner.phone,
+              district: storedClinicPet.owner.address,
+            }
+          : undefined,
+      }
+    : {
+        id: mockGrant.petId,
+        name: "Mochi",
+        species: "dog",
+        breed: "Corgi Wales Pembroke",
+        gender: "male",
+        birthDate: "2022-03-15",
+        weightKg: 11.5,
+        microchip: "982000412345678",
+        vaccinations: [
+          {
+            name: "Vắc-xin phòng dại Rabisin",
+            date: "2026-05-10",
+            nextDue: "2027-05-10",
+            lot: "RAB-2026-09",
+            clinic: "Phòng khám Thú y Bác Sĩ Tâm · Quận 3",
+          },
+          {
+            name: "Vanguard Plus 5/CV-L (Phòng 7 bệnh)",
+            date: "2026-05-10",
+            nextDue: "2027-05-10",
+            lot: "VG-2026-44",
+            clinic: "Phòng khám Thú y Bác Sĩ Tâm · Quận 3",
+          },
+        ],
+        medications: [
+          { name: "NexGard Spectra 7.5 - 15kg", dose: "1 viên", instructions: "Uống phòng ve rận & giun tim" },
+        ],
+        allergies: [{ name: "Dị ứng đạm bò", severity: "trung bình" }],
+        conditions: [{ name: "Viêm da dị ứng nhẹ", status: "đang kiểm soát" }],
+        ownerContact: mockGrant.includeOwnerContact
+          ? { name: "Nguyễn Văn An", phone: "0908 123 456", district: "Quận 3, TP.HCM" }
+          : undefined,
+      };
 
   const projection = projectSharedRecord(samplePet, {
     id: mockGrant.id,

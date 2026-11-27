@@ -4,6 +4,12 @@ import {cookies, headers} from "next/headers";
 import {z} from "zod";
 import {createClient, isSupabaseConfigured} from "@/lib/supabase/server";
 import {canAccessRole, homeForRole, parseRole, type AppRole} from "@/lib/auth/roles";
+import {
+  upsertOwnerAccountOnAuth,
+  upsertClinicAccountOnAuth,
+  resolveOwnerAccount,
+  resolveClinicAccount,
+} from "@/lib/portal-store/server-store";
 
 const credentials = z.object({
   email: z.string().trim().email(),
@@ -52,13 +58,42 @@ export async function signInAction(formData: FormData) {
   const target = rawNext === "/settings" || rawNext === "" ? defaultTarget : rawNext;
 
   if (!isSupabaseConfigured()) {
-    // In local development without Supabase credentials, sign in with a local dev session
+    // Sign in against unified persistent portal store (supports 4 paired Premium owners + Clinic)
     const cookieStore = await cookies();
-    const devUser = {
-      sub: context === "clinic" ? "dev-clinic-id" : "dev-owner-id",
+    if (context === "clinic") {
+      const clinicAcc = upsertClinicAccountOnAuth({
+        email: parsed.data.email,
+        isSignUp: false,
+      });
+      const devUser = {
+        sub: clinicAcc.id,
+        email: clinicAcc.email,
+        role: "clinic_admin" as AppRole,
+        name: clinicAcc.name,
+      };
+      cookieStore.set("pawcare_dev_session", JSON.stringify(devUser), {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7,
+        secure: process.env.NODE_ENV === "production",
+      });
+      if (!target.includes("clinic-profile-setup")) {
+        cookieStore.delete("pawcare_clinic_onboarding");
+      }
+      redirect(resolveTargetUrl(locale, target, "/clinic"));
+    }
+
+    const ownerAcc = upsertOwnerAccountOnAuth({
       email: parsed.data.email,
-      role: (context === "clinic" ? "clinic_admin" : "owner") as AppRole,
-      name: parsed.data.email.split("@")[0],
+      password: parsed.data.password,
+      isSignUp: false,
+    });
+    const devUser = {
+      sub: ownerAcc.id,
+      email: ownerAcc.email,
+      role: "owner" as AppRole,
+      name: ownerAcc.profile.fullName,
     };
     cookieStore.set("pawcare_dev_session", JSON.stringify(devUser), {
       path: "/",
@@ -67,10 +102,16 @@ export async function signInAction(formData: FormData) {
       maxAge: 60 * 60 * 24 * 7,
       secure: process.env.NODE_ENV === "production",
     });
-    if (!target.includes("clinic-profile-setup")) {
-      cookieStore.delete("pawcare_clinic_onboarding");
-    }
-    redirect(resolveTargetUrl(locale, target, defaultTarget));
+    cookieStore.delete("pawcare_clinic_onboarding");
+    const ownerDefaultTarget =
+      ownerAcc.onboardingCompleted && ownerAcc.petIds.length > 0
+        ? "/owner"
+        : "/owner/setup";
+    const resolvedOwnerTarget =
+      rawNext && rawNext !== "/settings" && rawNext !== "/owner/setup"
+        ? rawNext
+        : ownerDefaultTarget;
+    redirect(resolveTargetUrl(locale, resolvedOwnerTarget, ownerDefaultTarget));
   }
 
   const supabase = await createClient();
@@ -120,14 +161,39 @@ export async function signUpAction(formData: FormData) {
   const target = rawNext === "/settings" || rawNext === "" ? defaultTarget : rawNext;
 
   if (!isSupabaseConfigured()) {
-    // In local development without Supabase credentials, log in immediately with the new PawCare profile!
+    // Register & persist account in the unified portal store
     const cookieStore = await cookies();
-    const devUser = {
-      sub: intent === "clinic" ? `dev-clinic-${Date.now()}` : `dev-owner-${Date.now()}`,
-      email: parsed.data.email,
-      role: (intent === "clinic" ? "clinic_admin" : "owner") as AppRole,
-      name: parsed.data.name,
-    };
+    const rawLicense = String(formData.get("license") || "").trim();
+    const devUser =
+      intent === "clinic"
+        ? (() => {
+            const clinicAcc = upsertClinicAccountOnAuth({
+              email: parsed.data.email,
+              name: parsed.data.name,
+              license: rawLicense,
+              isSignUp: true,
+            });
+            return {
+              sub: clinicAcc.id,
+              email: clinicAcc.email,
+              role: "clinic_admin" as AppRole,
+              name: clinicAcc.name,
+            };
+          })()
+        : (() => {
+            const ownerAcc = upsertOwnerAccountOnAuth({
+              email: parsed.data.email,
+              name: parsed.data.name,
+              password: parsed.data.password,
+              isSignUp: true,
+            });
+            return {
+              sub: ownerAcc.id,
+              email: ownerAcc.email,
+              role: "owner" as AppRole,
+              name: ownerAcc.profile.fullName,
+            };
+          })();
     cookieStore.set("pawcare_dev_session", JSON.stringify(devUser), {
       path: "/",
       httpOnly: true,
@@ -201,14 +267,24 @@ export async function googleSignInAction(formData: FormData) {
   const mainPath = context === "clinic" ? (mode === "sign-up" ? "/clinic-profile-setup" : "/clinic") : "/owner/setup";
 
   if (!isSupabaseConfigured()) {
-    // When Supabase is not yet configured, simulate a Google/Gmail login for preview testing
+    // When Supabase is not yet configured, pair Google sign-in with the persistent portal store
     const cookieStore = await cookies();
-    const devUser = {
-      sub: "dev-google-user-id",
-      email: "google-user@gmail.com",
-      role: context === "clinic" ? "clinic_admin" : "owner",
-      name: locale === "en" ? "Google Demo Account" : "Tài khoản Google Demo",
-    };
+    const clinicAcc = resolveClinicAccount("clinic@pawcare.vn");
+    const ownerAcc = resolveOwnerAccount("yen.le@pawcare.vn");
+    const devUser =
+      context === "clinic"
+        ? {
+            sub: clinicAcc.id,
+            email: clinicAcc.email,
+            role: "clinic_admin" as AppRole,
+            name: clinicAcc.name,
+          }
+        : {
+            sub: ownerAcc.id,
+            email: ownerAcc.email,
+            role: "owner" as AppRole,
+            name: ownerAcc.profile.fullName,
+          };
     cookieStore.set("pawcare_dev_session", JSON.stringify(devUser), {
       path: "/",
       httpOnly: true,
@@ -228,7 +304,15 @@ export async function googleSignInAction(formData: FormData) {
       cookieStore.delete("pawcare_clinic_onboarding");
     }
 
-    redirect(resolveTargetUrl(locale, next, mainPath));
+    const googleDefaultPath =
+      context === "clinic"
+        ? mode === "sign-up"
+          ? "/clinic-profile-setup"
+          : "/clinic"
+        : ownerAcc.onboardingCompleted && ownerAcc.petIds.length > 0
+        ? "/owner"
+        : "/owner/setup";
+    redirect(resolveTargetUrl(locale, next, googleDefaultPath));
   }
 
   const supabase = await createClient();

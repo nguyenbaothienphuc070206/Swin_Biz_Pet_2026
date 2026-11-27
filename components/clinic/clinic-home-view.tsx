@@ -123,25 +123,34 @@ export function ClinicHomeView({
       }
     } catch {}
 
-    try {
-      const storedApts = localStorage.getItem("pawcare-appointments");
-      if (storedApts) {
-        const parsed = JSON.parse(storedApts);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setTodayQueue(
-            parsed.slice(0, 4).map((apt: any) => ({
-              id: apt.id,
-              time: apt.time || "09:30",
-              petName: apt.petName || (isEn ? "Bo" : "Bơ"),
-              breed: apt.pets?.[0]?.breed || apt.breed || (isEn ? "Companion pet" : "Thú cưng"),
-              ownerName: apt.ownerName || (isEn ? "Pet owner" : "Chủ nuôi"),
-              service: apt.service || (isEn ? "General checkup" : "Khám tổng quát"),
-              status: apt.status || "confirmed",
-            }))
-          );
+    const syncQueue = () => {
+      try {
+        const storedApts = localStorage.getItem("pawcare-appointments");
+        if (storedApts) {
+          const parsed = JSON.parse(storedApts);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTodayQueue(
+              parsed.slice(0, 4).map((apt: any) => ({
+                id: apt.id,
+                time: apt.time || "09:30",
+                petName: apt.petName || (isEn ? "Bo" : "Bơ"),
+                breed: apt.pets?.[0]?.breed || apt.breed || (isEn ? "Companion pet" : "Thú cưng"),
+                ownerName: apt.ownerName || (isEn ? "Pet owner" : "Chủ nuôi"),
+                service: apt.service || (isEn ? "General checkup" : "Khám tổng quát"),
+                status: apt.status || "confirmed",
+              }))
+            );
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    };
+    syncQueue();
+    window.addEventListener("pawcare-appointments-updated", syncQueue);
+    window.addEventListener("storage", syncQueue);
+    return () => {
+      window.removeEventListener("pawcare-appointments-updated", syncQueue);
+      window.removeEventListener("storage", syncQueue);
+    };
   }, [isEn]);
 
   // Sync with incoming live SOS dispatches

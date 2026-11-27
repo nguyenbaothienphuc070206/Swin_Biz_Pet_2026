@@ -1,12 +1,10 @@
 import {
-  generateShareToken,
   hashShareToken,
-  hashPin,
-  calculateExpiryDate,
   type ShareType,
   type SharePreset,
   type ShareScope,
 } from "./share-service";
+import { getPortalDatabase, persistPortalDatabase } from "@/lib/portal-store/server-store";
 
 export interface StoredGrant {
   id: string;
@@ -34,17 +32,37 @@ export interface StoredGrant {
   }>;
 }
 
-// Global in-memory map for dev/mock persistence across hot-reloads
 const globalMockGrants = new Map<string, StoredGrant>();
 
 export function saveMockGrant(grant: StoredGrant) {
   globalMockGrants.set(grant.tokenHash, grant);
   globalMockGrants.set(grant.token, grant);
   globalMockGrants.set(grant.id, grant);
+  try {
+    const db = getPortalDatabase();
+    db.shareGrants[grant.id] = grant;
+    persistPortalDatabase(db);
+  } catch {}
 }
 
 export function findMockGrantByTokenOrHash(tokenOrHash: string): StoredGrant | null {
-  const found = globalMockGrants.get(tokenOrHash) || globalMockGrants.get(hashShareToken(tokenOrHash));
+  let found =
+    globalMockGrants.get(tokenOrHash) ||
+    globalMockGrants.get(hashShareToken(tokenOrHash));
+
+  if (!found) {
+    try {
+      const db = getPortalDatabase();
+      const hashed = hashShareToken(tokenOrHash);
+      for (const g of Object.values(db.shareGrants || {})) {
+        if (g.id === tokenOrHash || g.token === tokenOrHash || g.tokenHash === tokenOrHash || g.tokenHash === hashed) {
+          found = g;
+          break;
+        }
+      }
+    } catch {}
+  }
+
   if (!found) return null;
   if (found.revokedAt) return null;
   if (new Date(found.expiresAt).getTime() < Date.now()) return null;
@@ -52,13 +70,22 @@ export function findMockGrantByTokenOrHash(tokenOrHash: string): StoredGrant | n
 }
 
 export function revokeMockGrant(grantId: string): boolean {
+  let revoked = false;
   for (const grant of globalMockGrants.values()) {
     if (grant.id === grantId) {
       grant.revokedAt = new Date().toISOString();
-      return true;
+      revoked = true;
     }
   }
-  return false;
+  try {
+    const db = getPortalDatabase();
+    if (db.shareGrants[grantId]) {
+      db.shareGrants[grantId].revokedAt = new Date().toISOString();
+      persistPortalDatabase(db);
+      revoked = true;
+    }
+  } catch {}
+  return revoked;
 }
 
 export function logMockShareAccess(
@@ -71,15 +98,22 @@ export function logMockShareAccess(
     coarseLocation: string;
   }
 ) {
+  const logEntry = {
+    id: crypto.randomUUID(),
+    accessedAt: new Date().toISOString(),
+    ...entry,
+  };
   for (const grant of globalMockGrants.values()) {
     if (grant.id === grantId) {
-      grant.accessLogs.unshift({
-        id: crypto.randomUUID(),
-        accessedAt: new Date().toISOString(),
-        ...entry,
-      });
+      grant.accessLogs.unshift(logEntry);
       break;
     }
   }
+  try {
+    const db = getPortalDatabase();
+    if (db.shareGrants[grantId]) {
+      db.shareGrants[grantId].accessLogs.unshift(logEntry);
+      persistPortalDatabase(db);
+    }
+  } catch {}
 }
-

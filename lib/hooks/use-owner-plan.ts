@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 export type OwnerPlan = "free" | "premium";
 
 export function useOwnerPlan() {
-  const [plan, setPlanState] = useState<OwnerPlan>("free");
+  const [plan, setPlanState] = useState<OwnerPlan>("premium");
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -13,10 +13,16 @@ export function useOwnerPlan() {
       const stored =
         localStorage.getItem("pawcare_subscription_plan") ||
         localStorage.getItem("pawcare_plan");
-      if (stored === "premium") {
-        setPlanState("premium");
-      } else {
+      if (stored === "free") {
         setPlanState("free");
+      } else {
+        setPlanState("premium");
+        if (!stored) {
+          try {
+            localStorage.setItem("pawcare_subscription_plan", "premium");
+            localStorage.setItem("pawcare_plan", "premium");
+          } catch {}
+        }
       }
       setIsLoaded(true);
     }
@@ -36,7 +42,7 @@ export function useOwnerPlan() {
       const stored =
         localStorage.getItem("pawcare_subscription_plan") ||
         localStorage.getItem("pawcare_plan");
-      setPlanState(stored === "premium" ? "premium" : "free");
+      setPlanState(stored === "free" ? "free" : "premium");
     };
     window.addEventListener("pawcare_plan_changed", handlePlanChange);
     return () => window.removeEventListener("pawcare_plan_changed", handlePlanChange);

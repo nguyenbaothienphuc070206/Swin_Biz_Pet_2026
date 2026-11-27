@@ -3,6 +3,11 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/server";
+import {
+  getPortalDatabase,
+  persistPortalDatabase,
+  resolveClinicAccount,
+} from "@/lib/portal-store/server-store";
 
 export interface ClinicProfileData {
   id: string;
@@ -48,6 +53,18 @@ export async function saveClinicProfileAction(
   data: ClinicProfileData,
   options?: { completeOnboarding?: boolean; locale?: "vi" | "en" }
 ) {
+  try {
+    const db = getPortalDatabase();
+    const clinicAcc = resolveClinicAccount(data.email || "clinic@pawcare.vn");
+    clinicAcc.profile = {
+      ...clinicAcc.profile,
+      ...data,
+    };
+    clinicAcc.name = data.name || clinicAcc.name;
+    clinicAcc.onboardingCompleted = true;
+    persistPortalDatabase(db);
+  } catch {}
+
   if (isSupabaseConfigured()) {
     try {
       const supabase = await createClient();

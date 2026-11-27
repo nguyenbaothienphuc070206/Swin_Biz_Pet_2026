@@ -43,11 +43,7 @@ export function AccountNav({ user, className = "" }: AccountNavProps) {
     try {
       if (typeof window !== "undefined") {
         try {
-          localStorage.removeItem("pawcare-user-pets");
-          localStorage.removeItem("pawcare-appointments");
-          localStorage.removeItem("pawcare-care-plans");
-          localStorage.removeItem("pawcare_active_pet_id");
-          localStorage.removeItem("pawcare_subscription_plan");
+          localStorage.removeItem("pawcare_synced_owner_id");
         } catch {}
       }
       // 1. Wipe cookie via dedicated route handler

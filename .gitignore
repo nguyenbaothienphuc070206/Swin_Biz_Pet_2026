@@ -13,5 +13,7 @@ sbom.cdx.json
 .env*
 !.env.example
 .vercel/
+.pawcare-data/
+debug.log
 
 .vercel

@@ -7,6 +7,7 @@ import { useLocale } from "next-intl";
 import { signOutAction } from "@/app/actions/auth";
 import { ThemeToggle } from "./theme-toggle";
 import { LocaleSwitcher } from "./locale-switcher";
+import { PortalSyncBridge } from "./portal-sync-bridge";
 
 export function ClinicShell({ children }: { children: React.ReactNode }) {
   const locale = useLocale();
@@ -86,7 +87,7 @@ export function ClinicShell({ children }: { children: React.ReactNode }) {
         {
           href: "/clinic/records",
           label: isEn ? "Pet Records" : "Hồ sơ thú cưng",
-          badge: "2",
+          badge: "4",
         },
         {
           href: "/clinic/care-plans",
@@ -415,6 +416,7 @@ export function ClinicShell({ children }: { children: React.ReactNode }) {
           <span className="truncate">{isEn ? "More" : "Thêm"}</span>
         </button>
       </nav>
+      <PortalSyncBridge role="clinic" />
     </div>
   );
 }

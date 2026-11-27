@@ -519,6 +519,13 @@ export function ClinicPetRecordsView({ locale }: { locale: string }) {
 
   useEffect(() => {
     loadSavedRecords();
+    const handleSync = () => loadSavedRecords();
+    window.addEventListener("pawcare-pets-updated", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("pawcare-pets-updated", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
   }, [loadSavedRecords]);
 
   useEffect(() => {
