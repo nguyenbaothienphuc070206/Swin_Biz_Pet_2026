@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
   const user = await getOptionalUser();
   const { action, key, ownerIdentifier, petId, planId, payload } = parsed.data;
   const actorId = ownerIdentifier || user?.email || user?.id || "owner-premium-01";
+  const isClinicActor = user?.role === "clinic_admin" || user?.role === "clinic_staff";
   const db = getPortalDatabase();
 
   switch (action) {
@@ -103,13 +104,17 @@ export async function POST(request: NextRequest) {
     }
     case "sync_appointments": {
       if (Array.isArray(payload)) {
-        syncAppointmentsToBackend(payload as any, actorId);
+        syncAppointmentsToBackend(payload as any, isClinicActor ? undefined : actorId);
       }
       break;
     }
     case "sync_care_plans": {
       if (Array.isArray(payload)) {
-        syncCarePlansToBackend(payload as any, true);
+        syncCarePlansToBackend(
+          payload as any,
+          isClinicActor,
+          isClinicActor ? "clinic" : "owner"
+        );
       }
       break;
     }
@@ -202,9 +207,13 @@ export async function POST(request: NextRequest) {
       } else if (key === "pawcare-clinic-pet-records" && Array.isArray(payload)) {
         syncClinicPetsToBackend(payload as any);
       } else if (key === "pawcare-appointments" && Array.isArray(payload)) {
-        syncAppointmentsToBackend(payload as any, actorId);
+        syncAppointmentsToBackend(payload as any, isClinicActor ? undefined : actorId);
       } else if (key === "pawcare-care-plans" && Array.isArray(payload)) {
-        syncCarePlansToBackend(payload as any, true);
+        syncCarePlansToBackend(
+          payload as any,
+          isClinicActor,
+          isClinicActor ? "clinic" : "owner"
+        );
       } else if (key.startsWith("pawcare_chat_") && Array.isArray(payload)) {
         const extractedPlanId = key.replace("pawcare_chat_", "");
         db.carePlanChats[extractedPlanId] = payload as any;

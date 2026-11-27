@@ -68,68 +68,6 @@ export function OwnerHomeView({
   const [isLoaded, setIsLoaded] = useState(false);
   const { plan: currentPlan, isPremium, isFree } = useOwnerPlan();
   const [displayName, setDisplayName] = useState(userName);
-  const [activeOwnerEmail, setActiveOwnerEmail] = useState<string>("yen.le@pawcare.vn");
-  const [switchingAccount, setSwitchingAccount] = useState<string | null>(null);
-
-  const pairedPremiumAccounts = [
-    {
-      id: "owner-premium-01",
-      email: "yen.le@pawcare.vn",
-      name: isEn ? "Le Hoang Yen" : "Lê Hoàng Yến",
-      petLabel: isEn ? "Bo (British Shorthair)" : "Bé Bơ (Mèo Anh lông ngắn)",
-      district: isEn ? "District 1" : "Quận 1",
-    },
-    {
-      id: "owner-premium-02",
-      email: "khoa.tran@pawcare.vn",
-      name: isEn ? "Tran Anh Khoa" : "Trần Anh Khoa",
-      petLabel: isEn ? "Mochi (Toy Poodle)" : "Bé Mochi (Toy Poodle)",
-      district: isEn ? "District 1" : "Quận 1",
-    },
-    {
-      id: "owner-premium-03",
-      email: "duc.pham@pawcare.vn",
-      name: isEn ? "Pham Minh Duc" : "Phạm Minh Đức",
-      petLabel: isEn ? "Lu (Poodle Toy)" : "Bé Lu (Poodle Toy)",
-      district: isEn ? "Binh Thanh" : "Bình Thạnh",
-    },
-    {
-      id: "owner-premium-04",
-      email: "trang.nguyen@pawcare.vn",
-      name: isEn ? "Nguyen Thu Trang" : "Nguyễn Thu Trang",
-      petLabel: isEn ? "Miu Miu (Calico Cat)" : "Bé Miu Miu (Mèo Tam thể)",
-      district: isEn ? "District 10" : "Quận 10",
-    },
-  ];
-
-  const handleSwitchPremiumAccount = async (targetEmail: string, targetName: string) => {
-    if (switchingAccount) return;
-    setSwitchingAccount(targetEmail);
-    try {
-      const res = await fetch("/api/portal/state", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: "switch_account",
-          targetEmail,
-          role: "owner",
-        }),
-      });
-      if (res.ok) {
-        setActiveOwnerEmail(targetEmail);
-        setDisplayName(targetName);
-        window.dispatchEvent(new Event("pawcare-force-portal-sync"));
-        showToast(
-          isEn
-            ? `Switched to Premium account: ${targetName} (Synced with Clinic Portal)`
-            : `Đã chuyển sang tài khoản Premium: ${targetName} (Đồng bộ trực tiếp với Cổng Phòng Khám)`
-        );
-      }
-    } catch {
-    } finally {
-      setSwitchingAccount(null);
-    }
-  };
 
   useEffect(() => {
     const updateNameFromStorage = () => {
@@ -137,11 +75,6 @@ export function OwnerHomeView({
         const storedName = localStorage.getItem("pawcare-owner-name");
         if (storedName && storedName.trim()) {
           setDisplayName(storedName.trim());
-        }
-        const storedProfile = localStorage.getItem("pawcare-user-profile");
-        if (storedProfile) {
-          const parsed = JSON.parse(storedProfile);
-          if (parsed?.email) setActiveOwnerEmail(parsed.email);
         }
       } catch {}
     };
@@ -727,68 +660,6 @@ export function OwnerHomeView({
           </div>
         </div>
       </div>
-
-      {/* ==================== 2.5. PAIRED PORTALS & 4 PREMIUM ACCOUNTS SWITCHER ==================== */}
-      <Card className="p-4 sm:p-6 rounded-3xl border border-primary/25 bg-card space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border/70 pb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                <CheckCircle2 className="size-3.5" />
-                {isEn ? "2-Portal Backend Paired" : "Đã kết nối & lưu dữ liệu 2 Portal"}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-bold text-primary">
-                <ShieldCheck className="size-3.5" />
-                {isEn ? "4 Premium Accounts" : "4 Tài khoản Premium"}
-              </span>
-            </div>
-            <h2 className="mt-1.5 font-display text-sm sm:text-base font-bold text-foreground">
-              {isEn
-                ? "Switch Paired Premium Owner Account (Live Sync with PetCare Clinic · Dist 1)"
-                : "Chuyển đổi 4 Tài khoản Chủ nuôi Premium (Đồng bộ thời gian thực với Phòng Khám PetCare · Quận 1)"}
-            </h2>
-          </div>
-          <span className="text-[11px] text-muted-foreground font-mono">
-            clinic@pawcare.vn ↔ 4 owners
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {pairedPremiumAccounts.map((acc) => {
-            const isCurrent =
-              activeOwnerEmail.toLowerCase() === acc.email.toLowerCase() ||
-              displayName.toLowerCase() === acc.name.toLowerCase();
-            return (
-              <button
-                key={acc.id}
-                type="button"
-                disabled={Boolean(switchingAccount)}
-                onClick={() => handleSwitchPremiumAccount(acc.email, acc.name)}
-                className={`text-left rounded-2xl border p-3 transition cursor-pointer ${
-                  isCurrent
-                    ? "border-primary bg-primary/10 ring-1 ring-primary"
-                    : "border-border bg-background hover:bg-secondary/60"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-1.5">
-                  <span className="font-display font-bold text-xs sm:text-sm text-foreground truncate">
-                    {acc.name}
-                  </span>
-                  <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary shrink-0">
-                    PREMIUM
-                  </span>
-                </div>
-                <p className="mt-1 text-xs font-medium text-foreground/90 truncate">
-                  {acc.petLabel}
-                </p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground font-mono truncate">
-                  {acc.email}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
 
       {/* ==================== 3. SECTION: THÚ CƯNG CỦA BẠN (YOUR COMPANIONS) ==================== */}
       <div className="space-y-4">

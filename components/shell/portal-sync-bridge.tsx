@@ -27,6 +27,7 @@ function isSyncedKey(key: string): boolean {
 }
 
 let isApplyingRemoteState = false;
+let hasCompletedInitialHydration = false;
 let interceptorInstalled = false;
 
 function safeSetLocalStorage(key: string, value: string): boolean {
@@ -44,7 +45,7 @@ function safeSetLocalStorage(key: string, value: string): boolean {
   }
 }
 
-function isRecentlyDirty(key: string, windowMs = 8000): boolean {
+function isRecentlyDirty(key: string, windowMs = 6000): boolean {
   if (typeof window === "undefined") return false;
   try {
     const ts = Number(window.sessionStorage.getItem(`pawcare_dirty_${key}`) || "0");
@@ -52,6 +53,17 @@ function isRecentlyDirty(key: string, windowMs = 8000): boolean {
   } catch {
     return false;
   }
+}
+
+function clearAllDirtyMarkers() {
+  if (typeof window === "undefined") return;
+  try {
+    for (const k of Object.keys(window.sessionStorage)) {
+      if (k.startsWith("pawcare_dirty_")) {
+        window.sessionStorage.removeItem(k);
+      }
+    }
+  } catch {}
 }
 
 function markKeyDirty(key: string) {
@@ -93,14 +105,14 @@ function installLocalStorageInterceptor() {
 
   window.localStorage.setItem = function (key: string, value: string) {
     originalSetItem(key, value);
-    if (!isApplyingRemoteState && isSyncedKey(key)) {
+    if (!isApplyingRemoteState && hasCompletedInitialHydration && isSyncedKey(key)) {
       pushStorageKeyToBackend(key, value);
     }
   };
 
   window.localStorage.removeItem = function (key: string) {
     originalRemoveItem(key);
-    if (!isApplyingRemoteState && key === "pawcare-active-sos-lead") {
+    if (!isApplyingRemoteState && hasCompletedInitialHydration && key === "pawcare-active-sos-lead") {
       pushStorageKeyToBackend(key, null);
     }
   };
@@ -116,9 +128,12 @@ export function PortalSyncBridge({ role }: { role: "owner" | "clinic" }) {
       if (syncingRef.current) return;
       syncingRef.current = true;
       try {
-        const res = await fetch(`/api/portal/state?role=${role === "clinic" ? "clinic_admin" : "owner"}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/portal/state?role=${role === "clinic" ? "clinic_admin" : "owner"}`,
+          {
+            cache: "no-store",
+          }
+        );
         if (!res.ok) return;
         const data = await res.json();
         if (!data?.success) return;
@@ -129,15 +144,22 @@ export function PortalSyncBridge({ role }: { role: "owner" | "clinic" }) {
         let changedProfile = false;
         let changedPlanTier = false;
 
+        const actorKey =
+          role === "clinic"
+            ? `clinic:${data.clinicAccount?.id || "dev-clinic-id"}`
+            : `owner:${data.ownerAccount?.id || "owner-premium-01"}`;
+        const prevActorKey = window.localStorage.getItem("pawcare_synced_actor_key");
+        const accountSwitched = prevActorKey !== actorKey;
+
+        if (accountSwitched) {
+          clearAllDirtyMarkers();
+          safeSetLocalStorage("pawcare_synced_actor_key", actorKey);
+        }
+
         if (role === "owner" && data.ownerAccount) {
-          const prevOwnerId = window.localStorage.getItem("pawcare_synced_owner_id");
-          const accountSwitched = prevOwnerId !== data.ownerAccount.id;
+          safeSetLocalStorage("pawcare_synced_owner_id", data.ownerAccount.id);
 
-          if (accountSwitched) {
-            safeSetLocalStorage("pawcare_synced_owner_id", data.ownerAccount.id);
-          }
-
-          // 1. Subscription Plan (4 Premium Accounts)
+          // 1. Subscription Plan (Provisioned Premium Owner account)
           if (data.plan && (accountSwitched || !isRecentlyDirty("pawcare_subscription_plan"))) {
             const c1 = safeSetLocalStorage("pawcare_subscription_plan", data.plan);
             const c2 = safeSetLocalStorage("pawcare_plan", data.plan);
@@ -153,12 +175,12 @@ export function PortalSyncBridge({ role }: { role: "owner" | "clinic" }) {
             safeSetLocalStorage("pawcare-owner-name", data.userProfile.fullName || "");
             safeSetLocalStorage("pawcare-user-phone", data.userProfile.phone || "");
             safeSetLocalStorage("pawcare-user-district", data.userProfile.district || "");
-            if (pChanged) changedProfile = true;
+            if (pChanged || accountSwitched) changedProfile = true;
           }
 
-          // 3. Owner Pets (Paired with Clinic EMR)
+          // 3. Owner Pets (Strictly scoped to this owner, paired with Clinic EMR)
           if (Array.isArray(data.userPets) && (accountSwitched || !isRecentlyDirty("pawcare-user-pets"))) {
-            if (safeSetLocalStorage("pawcare-user-pets", JSON.stringify(data.userPets))) {
+            if (safeSetLocalStorage("pawcare-user-pets", JSON.stringify(data.userPets)) || accountSwitched) {
               changedPets = true;
             }
           }
@@ -171,14 +193,14 @@ export function PortalSyncBridge({ role }: { role: "owner" | "clinic" }) {
           if (data.weightHistory && typeof data.weightHistory === "object") {
             for (const [petId, logs] of Object.entries(data.weightHistory)) {
               const wKey = `pawcare-weight-history-${petId}`;
-              if (!isRecentlyDirty(wKey)) {
+              if (accountSwitched || !isRecentlyDirty(wKey)) {
                 safeSetLocalStorage(wKey, JSON.stringify(logs));
               }
             }
           }
 
           // 5. Reminders
-          if (Array.isArray(data.reminders) && !isRecentlyDirty("pawcare-care-reminders")) {
+          if (Array.isArray(data.reminders) && (accountSwitched || !isRecentlyDirty("pawcare-care-reminders"))) {
             safeSetLocalStorage("pawcare-care-reminders", JSON.stringify(data.reminders));
           }
 
@@ -189,16 +211,17 @@ export function PortalSyncBridge({ role }: { role: "owner" | "clinic" }) {
         }
 
         if (role === "clinic") {
-          // 1. Clinic EMR Pet Records (All 4 Premium Owners' Pets + Newly Registered Pets)
+          // 1. Clinic EMR Pet Records (All 4 Paired Premium Owners' Pets + Newly Registered Pets)
           if (
             Array.isArray(data.clinicPetRecords) &&
-            !isRecentlyDirty("pawcare-clinic-pet-records")
+            (accountSwitched || !isRecentlyDirty("pawcare-clinic-pet-records"))
           ) {
             if (
               safeSetLocalStorage(
                 "pawcare-clinic-pet-records",
                 JSON.stringify(data.clinicPetRecords)
-              )
+              ) ||
+              accountSwitched
             ) {
               changedPets = true;
             }
@@ -215,15 +238,15 @@ export function PortalSyncBridge({ role }: { role: "owner" | "clinic" }) {
           }
         }
 
-        // Shared Cross-Portal Collections (Appointments, Care Plans, Chat, SOS)
-        if (Array.isArray(data.appointments) && !isRecentlyDirty("pawcare-appointments")) {
-          if (safeSetLocalStorage("pawcare-appointments", JSON.stringify(data.appointments))) {
+        // Scoped Cross-Portal Collections (Owner gets only their appointments/carePlans; Clinic gets all)
+        if (Array.isArray(data.appointments) && (accountSwitched || !isRecentlyDirty("pawcare-appointments"))) {
+          if (safeSetLocalStorage("pawcare-appointments", JSON.stringify(data.appointments)) || accountSwitched) {
             changedApts = true;
           }
         }
 
-        if (Array.isArray(data.carePlans) && !isRecentlyDirty("pawcare-care-plans")) {
-          if (safeSetLocalStorage("pawcare-care-plans", JSON.stringify(data.carePlans))) {
+        if (Array.isArray(data.carePlans) && (accountSwitched || !isRecentlyDirty("pawcare-care-plans"))) {
+          if (safeSetLocalStorage("pawcare-care-plans", JSON.stringify(data.carePlans)) || accountSwitched) {
             changedPlans = true;
           }
         }
@@ -231,7 +254,7 @@ export function PortalSyncBridge({ role }: { role: "owner" | "clinic" }) {
         if (data.carePlanChats && typeof data.carePlanChats === "object") {
           for (const [planId, msgs] of Object.entries(data.carePlanChats)) {
             const cKey = `pawcare_chat_${planId}`;
-            if (!isRecentlyDirty(cKey)) {
+            if (accountSwitched || !isRecentlyDirty(cKey)) {
               safeSetLocalStorage(cKey, JSON.stringify(msgs));
             }
           }
@@ -240,6 +263,8 @@ export function PortalSyncBridge({ role }: { role: "owner" | "clinic" }) {
         if (data.activeSosLead && !isRecentlyDirty("pawcare-active-sos-lead")) {
           safeSetLocalStorage("pawcare-active-sos-lead", JSON.stringify(data.activeSosLead));
         }
+
+        hasCompletedInitialHydration = true;
 
         // Notify active views if any paired collection updated
         if (changedPets) {
@@ -261,6 +286,7 @@ export function PortalSyncBridge({ role }: { role: "owner" | "clinic" }) {
           window.dispatchEvent(new Event("storage"));
         }
       } catch {
+        hasCompletedInitialHydration = true;
       } finally {
         syncingRef.current = false;
       }

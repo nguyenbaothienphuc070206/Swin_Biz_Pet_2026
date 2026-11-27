@@ -248,7 +248,6 @@ export function buildInitialPortalDatabase(): PortalStateDatabase {
       "owner@pawcare.vn",
       "an.nguyen@example.com",
       "an.nguyen@pawcare.vn",
-      "google-user@gmail.com",
     ],
     passwordHash: "Pawcare@2026",
     role: "owner",
@@ -1634,11 +1633,12 @@ export function syncAppointmentsToBackend(
  */
 export function syncCarePlansToBackend(
   incomingPlans: CarePlanProposal[],
-  replaceAll = false
+  replaceAll = false,
+  actorRole: "owner" | "clinic" = "clinic"
 ): CarePlanProposal[] {
   const db = getPortalDatabase();
 
-  if (replaceAll) {
+  if (replaceAll && actorRole === "clinic") {
     db.carePlans = incomingPlans;
   } else {
     const byId = new Map<string, CarePlanProposal>();
@@ -1714,6 +1714,28 @@ export function getScopedPortalState(params: {
   const ownerPets = ownerAcc.petIds
     .map((pid) => db.ownerPets[pid])
     .filter(Boolean);
+  const ownerPetIdSet = new Set(ownerAcc.petIds);
+  const ownerPetNameSet = new Set(ownerPets.map((p) => p.name.trim().toLowerCase()));
+  const ownerNameLower = ownerAcc.profile.fullName.trim().toLowerCase();
+  const ownerEmailLower = ownerAcc.email.trim().toLowerCase();
+
+  // Filter appointments strictly belonging to this authenticated owner or their pets
+  const scopedAppointments = db.appointments.filter((apt) => {
+    if (apt.ownerId && apt.ownerId === ownerAcc.id) return true;
+    if (apt.ownerEmail && apt.ownerEmail.trim().toLowerCase() === ownerEmailLower) return true;
+    if (apt.ownerName && apt.ownerName.trim().toLowerCase() === ownerNameLower) return true;
+    if (apt.petName && ownerPetNameSet.has(apt.petName.trim().toLowerCase())) return true;
+    if (Array.isArray(apt.pets) && apt.pets.some((p) => ownerPetIdSet.has(p.id))) return true;
+    return false;
+  });
+
+  // Filter care plans strictly belonging to this authenticated owner or their pets
+  const scopedCarePlans = db.carePlans.filter((plan) => {
+    if (ownerPetIdSet.has(plan.petId)) return true;
+    if (plan.petName && ownerPetNameSet.has(plan.petName.trim().toLowerCase())) return true;
+    if (plan.ownerName && plan.ownerName.trim().toLowerCase() === ownerNameLower) return true;
+    return false;
+  });
 
   const weightHistory: Record<string, WeightLogItem[]> = {};
   for (const p of ownerPets) {
@@ -1731,8 +1753,8 @@ export function getScopedPortalState(params: {
     userPets: ownerPets,
     activePetId: ownerAcc.activePetId || ownerPets[0]?.id || "",
     weightHistory,
-    appointments: db.appointments,
-    carePlans: db.carePlans,
+    appointments: scopedAppointments,
+    carePlans: scopedCarePlans,
     carePlanChats: db.carePlanChats,
     activeSosLead: db.activeSosLead,
     reminders: db.remindersByOwner[ownerAcc.id] || null,

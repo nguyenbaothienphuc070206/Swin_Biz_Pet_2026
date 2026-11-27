@@ -38,6 +38,37 @@ describe("Unified 2-Portal Backend Store & 4 Paired Premium Owner Accounts", () 
     expect(owner3.profile.fullName).toBe("Phạm Minh Đức");
     expect(owner4.profile.fullName).toBe("Nguyễn Thu Trang");
 
+    // Verify each owner only receives their own scoped pets, appointments, and care plans
+    const s1 = getScopedPortalState({ email: owner1.email, role: "owner" });
+    const s2 = getScopedPortalState({ email: owner2.email, role: "owner" });
+    const s3 = getScopedPortalState({ email: owner3.email, role: "owner" });
+    const s4 = getScopedPortalState({ email: owner4.email, role: "owner" });
+
+    expect(s1.userPets?.map((p) => p.name)).toEqual(["Bơ"]);
+    expect(s1.appointments?.map((a) => a.petName)).toEqual(["Bơ"]);
+    expect(s1.carePlans?.map((c) => c.petName)).toEqual(["Bơ"]);
+
+    expect(s2.userPets?.map((p) => p.name)).toEqual(["Mochi"]);
+    expect(s2.appointments?.map((a) => a.petName)).toEqual(["Mochi"]);
+    expect(s2.carePlans?.map((c) => c.petName)).toEqual(["Mochi"]);
+
+    expect(s3.userPets?.map((p) => p.name)).toEqual(["Lu"]);
+    expect(s3.appointments?.map((a) => a.petName)).toEqual(["Lu"]);
+    expect(s3.carePlans?.map((c) => c.petName)).toEqual(["Lu"]);
+
+    expect(s4.userPets?.map((p) => p.name)).toEqual(["Miu Miu"]);
+    expect(s4.appointments?.map((a) => a.petName)).toEqual(["Miu Miu"]);
+    expect(s4.carePlans?.map((c) => c.petName)).toEqual(["Miu Miu"]);
+
+    // While the paired Clinic account receives all 4 owners' pets, appointments, and care plans
+    const clinicState = getScopedPortalState({
+      email: "clinic@pawcare.vn",
+      role: "clinic_admin",
+    });
+    expect(clinicState.clinicPetRecords).toHaveLength(4);
+    expect(clinicState.appointments).toHaveLength(4);
+    expect(clinicState.carePlans).toHaveLength(4);
+
     // Alias resolution
     expect(resolveOwnerAccount("owner1@pawcare.vn").id).toBe(owner1.id);
     expect(resolveOwnerAccount("owner2@pawcare.vn").id).toBe(owner2.id);
