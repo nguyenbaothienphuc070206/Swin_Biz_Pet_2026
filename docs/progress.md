@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-27 — Fix Pet Health Passport PDF Export Missing Latin Glyphs
+
+- Root cause: `public/fonts/be-vietnam-pro-vietnamese-400.woff` and `be-vietnam-pro-vietnamese-700.woff` were previously 6 KB CSS `unicode-range` subset files containing only Vietnamese accented characters (plus `A`), causing `pdf-lib` to drop all Basic Latin characters (`B-Z`, `a-z`, `0-9`) when rendering exported PDFs.
+- Replaced both font files with full 132 KB / 140 KB `Be Vietnam Pro` Regular & Bold TrueType binaries (527 glyphs covering Basic Latin, Latin-Ext, Vietnamese, numbers, and punctuation) and embedded them with `subset: false` in `modules/passport/pdf.ts` for universal PDF viewer compatibility.
+- Added `sanitizePdfText` (NFD-to-NFC normalization and dingbat replacement) and `wrapPdfText` / `truncateToWidth` in `modules/passport/pdf.ts` so long clinical summaries, prescriptions, allergies, conditions, and footers wrap cleanly within A4 margins without glyph errors.
+- Updated `app/api/passport/[petId]/export/route.ts`, `components/owner/pet-passport-view.tsx`, and `components/clinic/clinic-pet-records-view.tsx` to support unauthenticated QR-verification downloads and live pet snapshots (`?snapshot=...`) across all paired and custom pets.
+- Added glyph-completeness regression tests in `modules/passport/pdf.test.ts` asserting 100% Latin + Vietnamese character coverage.
+
 ## 2026-11-27 — Unified 2-Portal Backend Persistence & 4 Paired Premium Owner Accounts
 
 - Built unified backend repository `lib/portal-store/server-store.ts` with atomic file persistence (`.pawcare-data/portal-store.json` locally and `/tmp/pawcare-data/portal-store.json` + `globalThis` in serverless) and bidirectional data projection between Owner Portal (`OwnerPetRecord`) and Clinic Portal (`PetRecordData`).

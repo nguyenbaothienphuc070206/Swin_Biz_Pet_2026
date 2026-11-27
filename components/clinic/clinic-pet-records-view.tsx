@@ -1568,7 +1568,9 @@ export function ClinicPetRecordsView({ locale }: { locale: string }) {
               </button>
 
               <a
-                href={`/api/passport/${encodeURIComponent(activePet.id)}/export?locale=${locale}`}
+                href={`/api/passport/${encodeURIComponent(activePet.id)}/export?locale=${locale}&include_owner=1&snapshot=${encodeURIComponent(
+                  JSON.stringify(activePet)
+                )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 inline-flex min-h-9 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground hover:brightness-95"

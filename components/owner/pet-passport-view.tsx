@@ -599,7 +599,9 @@ export function PetPassportView({ locale }: { locale: string }) {
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <a
-                  href={`/api/passport/${encodeURIComponent(currentPet.id)}/export?locale=${locale}`}
+                  href={`/api/passport/${encodeURIComponent(currentPet.id)}/export?locale=${locale}&snapshot=${encodeURIComponent(
+                    JSON.stringify(currentPet)
+                  )}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-border px-3.5 py-2 text-xs font-semibold transition hover:bg-accent"

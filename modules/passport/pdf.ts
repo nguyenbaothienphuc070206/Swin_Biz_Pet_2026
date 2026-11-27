@@ -1,7 +1,7 @@
 import "server-only";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { PDFDocument, rgb, StandardFonts, grayscale, PDFPage, PDFFont } from "pdf-lib";
+import { PDFDocument, rgb, PDFFont } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import QRCode from "qrcode";
 import type { RabiesStatusResult } from "./share-service";
@@ -64,31 +64,119 @@ export interface PassportPdfInput {
   verificationUrl?: string;
 }
 
+/**
+ * Normalizes Unicode NFC (converting any decomposed NFD Vietnamese characters into
+ * precomposed NFC characters) and replaces dingbats/unsupported symbols with clean
+ * glyph-safe equivalents.
+ */
+export function sanitizePdfText(raw: string | undefined | null, supportedSet?: Set<number>): string {
+  if (!raw) return "";
+  const normalized = String(raw)
+    .normalize("NFC")
+    .replace(/\u2713|\u2714|\u2611/g, "[OK]")
+    .replace(/\u26A0|\uFE0F/g, "[!]")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/[\u00A0\u202F]/g, " ")
+    .replace(/[\r\n\t]+/g, " ");
+
+  if (!supportedSet) return normalized;
+
+  let out = "";
+  for (const ch of normalized) {
+    const cp = ch.codePointAt(0);
+    if (cp !== undefined && supportedSet.has(cp)) {
+      out += ch;
+    } else if (cp !== undefined && cp > 0x7f) {
+      out += " ";
+    }
+  }
+  return out.replace(/\s{2,}/g, " ").trim();
+}
+
+function wrapPdfText(
+  text: string,
+  font: PDFFont,
+  fontSize: number,
+  maxWidth: number,
+  supportedSet?: Set<number>
+): string[] {
+  const clean = sanitizePdfText(text, supportedSet);
+  if (!clean) return [""];
+
+  const words = clean.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+    let width = 0;
+    try {
+      width = font.widthOfTextAtSize(candidate, fontSize);
+    } catch {
+      width = candidate.length * (fontSize * 0.55);
+    }
+
+    if (width <= maxWidth || !currentLine) {
+      currentLine = candidate;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines;
+}
+
+function truncateToWidth(
+  text: string,
+  font: PDFFont,
+  fontSize: number,
+  maxWidth: number,
+  supportedSet?: Set<number>
+): string {
+  const clean = sanitizePdfText(text, supportedSet);
+  if (!clean) return "";
+  try {
+    if (font.widthOfTextAtSize(clean, fontSize) <= maxWidth) return clean;
+    let truncated = clean;
+    while (truncated.length > 3 && font.widthOfTextAtSize(`${truncated}...`, fontSize) > maxWidth) {
+      truncated = truncated.slice(0, -1);
+    }
+    return `${truncated}...`;
+  } catch {
+    return clean.slice(0, 32);
+  }
+}
+
 export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
 
-  // Load Be Vietnam Pro Regular & Bold fonts for full Vietnamese diacritics
-  let regularFontBytes: Buffer;
-  let boldFontBytes: Buffer;
+  // Load full Be Vietnam Pro Regular & Bold fonts (complete Latin + Latin-Ext + Vietnamese glyphs)
+  const regularFontBytes = await readFile(
+    join(process.cwd(), "public", "fonts", "be-vietnam-pro-vietnamese-400.woff")
+  );
+  const boldFontBytes = await readFile(
+    join(process.cwd(), "public", "fonts", "be-vietnam-pro-vietnamese-700.woff")
+  );
 
-  try {
-    regularFontBytes = await readFile(join(process.cwd(), "public", "fonts", "be-vietnam-pro-vietnamese-400.woff"));
-  } catch {
-    regularFontBytes = await readFile(join(process.cwd(), "node_modules", "@fontsource", "be-vietnam-pro", "files", "be-vietnam-pro-vietnamese-400-normal.woff"));
-  }
+  // Use subset: false so every embedded glyph in the font remains intact across all PDF viewers
+  const regularFont = await pdf.embedFont(regularFontBytes, { subset: false });
+  const boldFont = await pdf.embedFont(boldFontBytes, { subset: false });
 
-  try {
-    boldFontBytes = await readFile(join(process.cwd(), "public", "fonts", "be-vietnam-pro-vietnamese-700.woff"));
-  } catch {
-    boldFontBytes = await readFile(join(process.cwd(), "node_modules", "@fontsource", "be-vietnam-pro", "files", "be-vietnam-pro-vietnamese-700-normal.woff"));
-  }
+  const regularSet = new Set<number>(regularFont.getCharacterSet());
+  const boldSet = new Set<number>(boldFont.getCharacterSet());
 
-  const regularFont = await pdf.embedFont(regularFontBytes, { subset: true });
-  const boldFont = await pdf.embedFont(boldFontBytes, { subset: true });
+  const safeReg = (s?: string | null) => sanitizePdfText(s, regularSet);
+  const safeBold = (s?: string | null) => sanitizePdfText(s, boldSet);
 
   const isVi = input.locale === "vi";
-  const sections = new Set(input.sections || ["vaccinations", "medications", "allergies", "conditions", "visits"]);
+  const sections = new Set(
+    input.sections || ["vaccinations", "medications", "allergies", "conditions", "visits"]
+  );
 
   // Colors
   const cPrimary = rgb(0.06, 0.45, 0.35); // #0f766e teal
@@ -101,28 +189,23 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
   const cAlertRed = rgb(0.78, 0.15, 0.15);
   const cAlertBg = rgb(0.99, 0.93, 0.93);
 
-  // A4 size: 595 x 842 pt
+  // A4 size: 595.28 x 841.89 pt
   let page = pdf.addPage([595.28, 841.89]);
   let y = 800;
   const leftX = 40;
   const contentWidth = 515;
 
-  const checkPageBreak = (neededHeight: number) => {
-    if (y - neededHeight < 60) {
-      page = pdf.addPage([595.28, 841.89]);
-      y = 800;
-      drawPageHeaderMini();
-    }
-  };
-
   const drawPageHeaderMini = () => {
-    page.drawText(`PawCare · ${input.pet.name} (${input.pet.species}) · ID: ${input.recordId.slice(0, 8)}`, {
-      x: leftX,
-      y,
-      size: 8,
-      font: regularFont,
-      color: cMuted,
-    });
+    page.drawText(
+      safeReg(`PawCare · ${input.pet.name} (${input.pet.species}) · ID: ${input.recordId.slice(0, 8)}`),
+      {
+        x: leftX,
+        y,
+        size: 8,
+        font: regularFont,
+        color: cMuted,
+      }
+    );
     page.drawLine({
       start: { x: leftX, y: y - 5 },
       end: { x: leftX + contentWidth, y: y - 5 },
@@ -132,8 +215,16 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     y -= 20;
   };
 
+  const checkPageBreak = (neededHeight: number) => {
+    if (y - neededHeight < 65) {
+      page = pdf.addPage([595.28, 841.89]);
+      y = 800;
+      drawPageHeaderMini();
+    }
+  };
+
   // --- 1. Top Document Header ---
-  page.drawText("PAWCARE VIETNAM", {
+  page.drawText(safeBold("PAWCARE VIETNAM · DIGITAL VETERINARY REGISTRY"), {
     x: leftX,
     y,
     size: 9,
@@ -143,7 +234,7 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
   y -= 18;
 
   const docTitle = isVi ? "SỔ Y BẠ & HỒ SƠ SỨC KHỎE ĐIỆN TỬ" : "DIGITAL PET HEALTH PASSPORT";
-  page.drawText(docTitle, {
+  page.drawText(safeBold(docTitle), {
     x: leftX,
     y,
     size: 16,
@@ -157,13 +248,20 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     timeZone: "Asia/Ho_Chi_Minh",
   }).format(input.generatedAt);
 
-  page.drawText(`${isVi ? "Mã hồ sơ" : "Record ID"}: #${input.recordId.slice(0, 8)} · ${isVi ? "Xuất ngày" : "Generated"}: ${generatedDateStr}`, {
-    x: leftX,
-    y: y - 14,
-    size: 8.5,
-    font: regularFont,
-    color: cMuted,
-  });
+  page.drawText(
+    safeReg(
+      `${isVi ? "Mã hồ sơ" : "Record ID"}: #${input.recordId.slice(0, 12)} · ${
+        isVi ? "Xuất ngày" : "Generated"
+      }: ${generatedDateStr}`
+    ),
+    {
+      x: leftX,
+      y: y - 15,
+      size: 8.5,
+      font: regularFont,
+      color: cMuted,
+    }
+  );
 
   // Verification QR code in Top-Right
   const verifyUrl = input.verificationUrl || `https://pawcare.vn/records/verify/${input.recordId}`;
@@ -179,20 +277,20 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     const qrX = leftX + contentWidth - qrSize;
     const qrY = y - 36;
     page.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-    page.drawText(isVi ? "Quét để đối chiếu" : "Scan to verify", {
-      x: qrX - 5,
-      y: qrY - 8,
+    page.drawText(safeReg(isVi ? "Quét mã xác thực" : "Scan to verify"), {
+      x: qrX - 2,
+      y: qrY - 9,
       size: 6.5,
       font: regularFont,
       color: cMuted,
     });
   } catch {}
 
-  y -= 45;
+  y -= 48;
 
   // --- 2. Pet Identity Card ---
-  checkPageBreak(90);
-  const cardHeight = input.ownerContact ? 84 : 70;
+  checkPageBreak(92);
+  const cardHeight = input.ownerContact ? 86 : 72;
   page.drawRectangle({
     x: leftX,
     y: y - cardHeight,
@@ -203,7 +301,7 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     borderWidth: 0.8,
   });
 
-  const petName = input.pet.name.toUpperCase();
+  const petName = safeBold(input.pet.name.toUpperCase());
   page.drawText(petName, {
     x: leftX + 14,
     y: y - 20,
@@ -212,32 +310,68 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     color: cPrimary,
   });
 
-  const speciesBreed = `${input.pet.species === "dog" ? (isVi ? "Chó" : "Dog") : input.pet.species === "cat" ? (isVi ? "Mèo" : "Cat") : (input.pet.species)} · ${input.pet.breed || (isVi ? "Giống hỗn hợp" : "Mixed breed")} · ${input.pet.gender === "female" ? (isVi ? "Cái" : "Female") : (isVi ? "Đực" : "Male")}`;
+  const genderLabel =
+    input.pet.gender === "female" || input.pet.gender === "female_spayed"
+      ? isVi
+        ? "Cái"
+        : "Female"
+      : input.pet.gender === "neutered" || input.pet.gender === "male_neutered"
+      ? isVi
+        ? "Đực (Đã triệt sản)"
+        : "Male (Neutered)"
+      : isVi
+      ? "Đực"
+      : "Male";
+
+  const speciesLabel =
+    input.pet.species === "dog"
+      ? isVi
+        ? "Chó (Canine)"
+        : "Dog (Canine)"
+      : input.pet.species === "cat"
+      ? isVi
+        ? "Mèo (Feline)"
+        : "Cat (Feline)"
+      : input.pet.species;
+
+  const speciesBreed = safeReg(
+    `${speciesLabel} · ${input.pet.breed || (isVi ? "Giống tiêu chuẩn" : "Standard breed")} · ${genderLabel}`
+  );
   page.drawText(speciesBreed, {
     x: leftX + 14,
-    y: y - 35,
+    y: y - 36,
     size: 9.5,
     font: regularFont,
     color: cDark,
   });
 
-  const chipStr = `${isVi ? "Vi mạch" : "Microchip"}: ${input.pet.microchip || (isVi ? "Chưa gắn chip" : "None")}`;
-  const weightStr = `${isVi ? "Cân nặng" : "Weight"}: ${input.pet.weightKg ? `${input.pet.weightKg} kg` : (isVi ? "Chưa đo" : "N/A")}`;
-  const dobStr = `${isVi ? "Ngày sinh" : "DOB"}: ${input.pet.birthDate || (isVi ? "Không rõ" : "Unknown")}`;
+  const chipStr = `${isVi ? "Vi mạch ISO" : "Microchip"}: ${
+    input.pet.microchip || (isVi ? "Chưa gắn chip" : "None")
+  }`;
+  const weightStr = `${isVi ? "Cân nặng" : "Weight"}: ${
+    input.pet.weightKg ? `${input.pet.weightKg} kg` : isVi ? "Chưa đo" : "N/A"
+  }`;
+  const dobStr = `${isVi ? "Ngày sinh" : "DOB"}: ${
+    input.pet.birthDate || (isVi ? "Không rõ" : "Unknown")
+  }`;
 
-  page.drawText(`${chipStr}  |  ${weightStr}  |  ${dobStr}`, {
+  page.drawText(safeReg(`${chipStr}  |  ${weightStr}  |  ${dobStr}`), {
     x: leftX + 14,
-    y: y - 50,
+    y: y - 52,
     size: 8.5,
     font: regularFont,
     color: cMuted,
   });
 
   if (input.ownerContact) {
-    const ownerStr = `${isVi ? "Chủ nuôi" : "Owner"}: ${input.ownerContact.name || "N/A"} · ${input.ownerContact.phone || ""} · ${input.ownerContact.district || ""}`;
+    const ownerStr = safeBold(
+      `${isVi ? "Chủ nuôi" : "Owner"}: ${input.ownerContact.name || "N/A"} · ${
+        input.ownerContact.phone || ""
+      } · ${input.ownerContact.district || ""}`
+    );
     page.drawText(ownerStr, {
       x: leftX + 14,
-      y: y - 66,
+      y: y - 68,
       size: 8.5,
       font: boldFont,
       color: cDark,
@@ -247,25 +381,29 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
   y -= cardHeight + 14;
 
   // --- 3. Rabies Compliance Badge (Mandatory under VN Law) ---
-  checkPageBreak(50);
+  checkPageBreak(52);
   const rabies = input.rabiesStatus;
   const isRabiesValid = rabies.hasRabiesVaccine && rabies.isValid;
 
   page.drawRectangle({
     x: leftX,
-    y: y - 38,
+    y: y - 40,
     width: contentWidth,
-    height: 38,
+    height: 40,
     color: isRabiesValid ? cValidBg : cAlertBg,
     borderColor: isRabiesValid ? cValidGreen : cAlertRed,
     borderWidth: 1,
   });
 
   const rabiesTitle = isRabiesValid
-    ? (isVi ? "✓ ĐÃ TIÊM PHÒNG DẠI HỢP LỆ (RABIES VALID)" : "✓ RABIES VACCINATION CERTIFIED (VALID)")
-    : (isVi ? "⚠ CẢNH BÁO: CHƯA CÓ CHỨNG NHẬN TIÊM DẠI HỢP LỆ (EXPIRED / NONE)" : "⚠ WARNING: NO VALID RABIES RECORD FOUND");
+    ? isVi
+      ? "[ĐẠT CHUẨN] ĐÃ TIÊM PHÒNG DẠI HỢP LỆ (RABIES VACCINATION VALID)"
+      : "[CERTIFIED] RABIES VACCINATION VALID & COMPLIANT"
+    : isVi
+    ? "[CẢNH BÁO] CHƯA CÓ CHỨNG NHẬN TIÊM DẠI HỢP LỆ (EXPIRED / NONE)"
+    : "[WARNING] NO VALID RABIES VACCINATION RECORD FOUND";
 
-  page.drawText(rabiesTitle, {
+  page.drawText(safeBold(rabiesTitle), {
     x: leftX + 12,
     y: y - 16,
     size: 9.5,
@@ -274,27 +412,34 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
   });
 
   const rabiesSub = isRabiesValid
-    ? (isVi
-        ? `Có giá trị đến: ${rabies.expiresAt} (còn ${rabies.daysRemaining} ngày) · Lô: ${rabies.lot || "N/A"} · Cơ sở cấp: ${rabies.issuingClinic || "Phòng khám thú y"}`
-        : `Valid until: ${rabies.expiresAt} (${rabies.daysRemaining} days left) · Lot: ${rabies.lot || "N/A"} · Clinic: ${rabies.issuingClinic || "Verified Practice"}`)
-    : (isVi
-        ? "Theo Nghị định 90/2017/NĐ-CP & Thông tư 07/2016/TT-BNNPTNT, tiêm phòng dại là bắt buộc. Phạt 600.000 - 800.000đ nếu vi phạm."
-        : "Mandatory under Vietnam Veterinary Regulations. Unvaccinated pets risk animal quarantine and administrative penalties.");
+    ? isVi
+      ? `Hiệu lực đến: ${rabies.expiresAt} (còn ${rabies.daysRemaining} ngày) · Lô: ${
+          rabies.lot || "N/A"
+        } · Cơ sở cấp: ${rabies.issuingClinic || "Phòng khám thú y PawCare"}`
+      : `Valid until: ${rabies.expiresAt} (${rabies.daysRemaining} days left) · Lot: ${
+          rabies.lot || "N/A"
+        } · Clinic: ${rabies.issuingClinic || "Verified Practice"}`
+    : isVi
+    ? "Theo Nghị định 90/2017/NĐ-CP & Thông tư 07/2016/TT-BNNPTNT, tiêm phòng dại là bắt buộc đối với chó mèo."
+    : "Mandatory under Vietnam Veterinary Regulations. Unvaccinated pets risk animal quarantine and penalties.";
 
-  page.drawText(rabiesSub, {
-    x: leftX + 12,
-    y: y - 30,
-    size: 7.5,
-    font: regularFont,
-    color: isRabiesValid ? cValidGreen : cAlertRed,
-  });
+  page.drawText(
+    truncateToWidth(rabiesSub, regularFont, 7.8, contentWidth - 24, regularSet),
+    {
+      x: leftX + 12,
+      y: y - 30,
+      size: 7.8,
+      font: regularFont,
+      color: isRabiesValid ? cValidGreen : cAlertRed,
+    }
+  );
 
-  y -= 52;
+  y -= 54;
 
   // --- 4. Vaccination History Section ---
   if (sections.has("vaccinations") && input.vaccinations.length > 0) {
-    checkPageBreak(40);
-    page.drawText(isVi ? "LỊCH SỬ TIÊM CHỦNG VẮC-XIN" : "VACCINATION RECORDS", {
+    checkPageBreak(45);
+    page.drawText(safeBold(isVi ? "LỊCH SỬ TIÊM CHỦNG VẮC-XIN" : "VACCINATION RECORDS"), {
       x: leftX,
       y,
       size: 11,
@@ -314,11 +459,41 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
       borderWidth: 0.5,
     });
 
-    page.drawText(isVi ? "Vắc-xin & Số lô" : "Vaccine & Lot", { x: leftX + 8, y: y - 13, size: 8, font: boldFont, color: cDark });
-    page.drawText(isVi ? "Ngày tiêm" : "Date", { x: leftX + 180, y: y - 13, size: 8, font: boldFont, color: cDark });
-    page.drawText(isVi ? "Tái chủng" : "Next Due", { x: leftX + 250, y: y - 13, size: 8, font: boldFont, color: cDark });
-    page.drawText(isVi ? "Cơ sở / Bác sĩ" : "Clinic / Vet", { x: leftX + 330, y: y - 13, size: 8, font: boldFont, color: cDark });
-    page.drawText(isVi ? "Nguồn" : "Status", { x: leftX + 440, y: y - 13, size: 8, font: boldFont, color: cDark });
+    page.drawText(safeBold(isVi ? "Vắc-xin & Số lô" : "Vaccine & Lot"), {
+      x: leftX + 8,
+      y: y - 13,
+      size: 8,
+      font: boldFont,
+      color: cDark,
+    });
+    page.drawText(safeBold(isVi ? "Ngày tiêm" : "Date"), {
+      x: leftX + 190,
+      y: y - 13,
+      size: 8,
+      font: boldFont,
+      color: cDark,
+    });
+    page.drawText(safeBold(isVi ? "Tái chủng" : "Next Due"), {
+      x: leftX + 255,
+      y: y - 13,
+      size: 8,
+      font: boldFont,
+      color: cDark,
+    });
+    page.drawText(safeBold(isVi ? "Cơ sở / Bác sĩ" : "Clinic / Vet"), {
+      x: leftX + 325,
+      y: y - 13,
+      size: 8,
+      font: boldFont,
+      color: cDark,
+    });
+    page.drawText(safeBold(isVi ? "Trạng thái" : "Status"), {
+      x: leftX + 448,
+      y: y - 13,
+      size: 8,
+      font: boldFont,
+      color: cDark,
+    });
     y -= 22;
 
     for (const vax of input.vaccinations) {
@@ -326,17 +501,54 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
       const isVerified = vax.verified ?? true;
       const rowY = y;
 
-      const vaxName = `${vax.name.slice(0, 32)}${vax.lot ? ` (Lô: ${vax.lot})` : ""}`;
-      page.drawText(vaxName, { x: leftX + 8, y: rowY - 10, size: 8, font: boldFont, color: cDark });
-      page.drawText(vax.administeredAt, { x: leftX + 180, y: rowY - 10, size: 8, font: regularFont, color: cDark });
-      page.drawText(vax.nextDueAt || (isVi ? "Theo chỉ định" : "As instructed"), { x: leftX + 250, y: rowY - 10, size: 8, font: regularFont, color: cMuted });
-      page.drawText((vax.clinic || "PawCare").slice(0, 20), { x: leftX + 330, y: rowY - 10, size: 8, font: regularFont, color: cDark });
+      const rawVaxTitle = `${vax.name}${vax.lot ? ` (${vax.lot})` : ""}`;
+      const vaxName = truncateToWidth(rawVaxTitle, boldFont, 8, 176, boldSet);
+      const clinicLabel = truncateToWidth(
+        vax.clinic || "PawCare Partner Clinic",
+        regularFont,
+        8,
+        116,
+        regularSet
+      );
+
+      page.drawText(vaxName, {
+        x: leftX + 8,
+        y: rowY - 10,
+        size: 8,
+        font: boldFont,
+        color: cDark,
+      });
+      page.drawText(safeReg(vax.administeredAt), {
+        x: leftX + 190,
+        y: rowY - 10,
+        size: 8,
+        font: regularFont,
+        color: cDark,
+      });
+      page.drawText(safeReg(vax.nextDueAt || (isVi ? "Theo chỉ định" : "As scheduled")), {
+        x: leftX + 255,
+        y: rowY - 10,
+        size: 8,
+        font: regularFont,
+        color: cMuted,
+      });
+      page.drawText(clinicLabel, {
+        x: leftX + 325,
+        y: rowY - 10,
+        size: 8,
+        font: regularFont,
+        color: cDark,
+      });
 
       const statusBadge = isVerified
-        ? (isVi ? "[Xác thực]" : "[Verified]")
-        : (isVi ? "[Chủ khai]" : "[Owner]");
-      page.drawText(statusBadge, {
-        x: leftX + 440,
+        ? isVi
+          ? "[Xác thực]"
+          : "[Verified]"
+        : isVi
+        ? "[Chủ khai]"
+        : "[Owner]";
+      page.drawText(safeBold(statusBadge), {
+        x: leftX + 448,
         y: rowY - 10,
         size: 7.5,
         font: boldFont,
@@ -356,89 +568,154 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
 
   // --- 5. Prescriptions & Medications ---
   if (sections.has("medications") && input.prescriptions && input.prescriptions.length > 0) {
-    checkPageBreak(40);
-    page.drawText(isVi ? "ĐƠN THUỐC & ĐIỀU TRỊ HIỆN TẠI" : "CURRENT PRESCRIPTIONS & MEDICATIONS", {
-      x: leftX,
-      y,
-      size: 11,
-      font: boldFont,
-      color: cPrimary,
-    });
+    checkPageBreak(42);
+    page.drawText(
+      safeBold(isVi ? "ĐƠN THUỐC & ĐIỀU TRỊ HIỆN TẠI" : "CURRENT PRESCRIPTIONS & MEDICATIONS"),
+      {
+        x: leftX,
+        y,
+        size: 11,
+        font: boldFont,
+        color: cPrimary,
+      }
+    );
     y -= 14;
 
     for (const med of input.prescriptions) {
-      checkPageBreak(30);
-      page.drawText(`• ${med.name} - ${med.dose}`, { x: leftX + 8, y: y - 10, size: 8.5, font: boldFont, color: cDark });
-      page.drawText(`${isVi ? "Bắt đầu" : "Started"}: ${med.startedAt}${med.endedAt ? ` · ${isVi ? "Kết thúc" : "Ended"}: ${med.endedAt}` : ""} · ${med.instructions}`, {
-        x: leftX + 16,
-        y: y - 22,
-        size: 8,
-        font: regularFont,
-        color: cMuted,
+      const detailText = `${isVi ? "Bắt đầu" : "Started"}: ${med.startedAt}${
+        med.endedAt ? ` · ${isVi ? "Kết thúc" : "Ended"}: ${med.endedAt}` : ""
+      } · ${med.instructions}`;
+      const wrappedDetails = wrapPdfText(detailText, regularFont, 8, contentWidth - 24, regularSet);
+      checkPageBreak(18 + wrappedDetails.length * 12);
+
+      page.drawText(safeBold(`• ${med.name} — ${med.dose}`), {
+        x: leftX + 8,
+        y: y - 10,
+        size: 8.5,
+        font: boldFont,
+        color: cDark,
       });
-      y -= 28;
+      y -= 22;
+
+      for (const line of wrappedDetails) {
+        page.drawText(line, {
+          x: leftX + 16,
+          y,
+          size: 8,
+          font: regularFont,
+          color: cMuted,
+        });
+        y -= 12;
+      }
+      y -= 4;
     }
-    y -= 10;
+    y -= 8;
   }
 
   // --- 6. Allergies & Chronic Conditions ---
-  if ((sections.has("allergies") && input.allergies && input.allergies.length > 0) ||
-      (sections.has("conditions") && input.conditions && input.conditions.length > 0)) {
-    checkPageBreak(50);
-    page.drawText(isVi ? "DỊ ỨNG & TÌNH TRẠNG MÃN TÍNH" : "ALLERGIES & CHRONIC CONDITIONS", {
-      x: leftX,
-      y,
-      size: 11,
-      font: boldFont,
-      color: cPrimary,
-    });
+  if (
+    (sections.has("allergies") && input.allergies && input.allergies.length > 0) ||
+    (sections.has("conditions") && input.conditions && input.conditions.length > 0)
+  ) {
+    checkPageBreak(52);
+    page.drawText(
+      safeBold(isVi ? "DỊ ỨNG & TÌNH TRẠNG SỨC KHỎE" : "ALLERGIES & CHRONIC CONDITIONS"),
+      {
+        x: leftX,
+        y,
+        size: 11,
+        font: boldFont,
+        color: cPrimary,
+      }
+    );
     y -= 14;
 
     if (input.allergies && input.allergies.length > 0) {
-      const allergyStr = input.allergies.map((a) => `${a.name} (${a.severity || "theo dõi"})`).join(", ");
-      page.drawText(`${isVi ? "Dị ứng" : "Allergies"}: ${allergyStr}`, {
-        x: leftX + 8,
-        y: y - 10,
-        size: 8.5,
-        font: regularFont,
-        color: cAlertRed,
-      });
-      y -= 18;
+      const allergyStr = `${isVi ? "Dị ứng" : "Allergies"}: ${input.allergies
+        .map((a) => `${a.name} (${a.severity || (isVi ? "theo dõi" : "monitor")})`)
+        .join(", ")}`;
+      const lines = wrapPdfText(allergyStr, regularFont, 8.5, contentWidth - 16, regularSet);
+      for (const line of lines) {
+        checkPageBreak(15);
+        page.drawText(line, {
+          x: leftX + 8,
+          y: y - 10,
+          size: 8.5,
+          font: regularFont,
+          color: cAlertRed,
+        });
+        y -= 14;
+      }
+      y -= 4;
     }
 
     if (input.conditions && input.conditions.length > 0) {
-      const condStr = input.conditions.map((c) => `${c.name} [${c.status || "đang điều trị"}]`).join(", ");
-      page.drawText(`${isVi ? "Bệnh nền" : "Conditions"}: ${condStr}`, {
-        x: leftX + 8,
-        y: y - 10,
-        size: 8.5,
-        font: regularFont,
-        color: cDark,
-      });
-      y -= 18;
+      const condStr = `${isVi ? "Bệnh nền & Ghi chú" : "Conditions"}: ${input.conditions
+        .map((c) => `${c.name} [${c.status || (isVi ? "đang theo dõi" : "active")}]`)
+        .join(", ")}`;
+      const lines = wrapPdfText(condStr, regularFont, 8.5, contentWidth - 16, regularSet);
+      for (const line of lines) {
+        checkPageBreak(15);
+        page.drawText(line, {
+          x: leftX + 8,
+          y: y - 10,
+          size: 8.5,
+          font: regularFont,
+          color: cDark,
+        });
+        y -= 14;
+      }
+      y -= 4;
     }
-    y -= 10;
+    y -= 8;
   }
 
   // --- 7. Clinical Visits Timeline ---
   if (sections.has("visits") && input.visits && input.visits.length > 0) {
-    checkPageBreak(40);
-    page.drawText(isVi ? "LỊCH SỬ THĂM KHÁM & THỦ THUẬT" : "CLINICAL VISITS & PROCEDURES", {
-      x: leftX,
-      y,
-      size: 11,
-      font: boldFont,
-      color: cPrimary,
-    });
+    checkPageBreak(42);
+    page.drawText(
+      safeBold(isVi ? "LỊCH SỬ THĂM KHÁM & THỦ THUẬT" : "CLINICAL VISITS & PROCEDURES"),
+      {
+        x: leftX,
+        y,
+        size: 11,
+        font: boldFont,
+        color: cPrimary,
+      }
+    );
     y -= 14;
 
-    for (const visit of input.visits.slice(0, 5)) {
-      checkPageBreak(26);
-      page.drawText(`${visit.date} · ${visit.clinicName}`, { x: leftX + 8, y: y - 10, size: 8.5, font: boldFont, color: cDark });
-      page.drawText(visit.summary, { x: leftX + 16, y: y - 22, size: 8, font: regularFont, color: cMuted });
-      y -= 28;
+    for (const visit of input.visits.slice(0, 6)) {
+      const summaryLines = wrapPdfText(
+        visit.summary,
+        regularFont,
+        8,
+        contentWidth - 24,
+        regularSet
+      );
+      checkPageBreak(18 + summaryLines.length * 12);
+
+      page.drawText(safeBold(`${visit.date} · ${visit.clinicName}`), {
+        x: leftX + 8,
+        y: y - 10,
+        size: 8.5,
+        font: boldFont,
+        color: cDark,
+      });
+      y -= 22;
+
+      for (const line of summaryLines) {
+        page.drawText(line, {
+          x: leftX + 16,
+          y,
+          size: 8,
+          font: regularFont,
+          color: cMuted,
+        });
+        y -= 12;
+      }
+      y -= 4;
     }
-    y -= 10;
   }
 
   // --- 8. Footers on All Pages ---
@@ -449,17 +726,19 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
       ? "PawCare · Bản sao y bạ điện tử dùng để tra cứu thông tin tiêm chủng & khám chữa bệnh. Không thay thế chẩn đoán lâm sàng của bác sĩ thú y. Tuân thủ Nghị định 13/2023/NĐ-CP."
       : "PawCare · Digital health passport for veterinary tracking. Does not substitute in-person veterinary diagnosis. Complies with Decree 13/2023/ND-CP.";
 
-    p.drawText(disclaimer, {
-      x: leftX,
-      y: 28,
-      size: 7,
-      font: regularFont,
-      color: cMuted,
-      maxWidth: 450,
+    const footerLines = wrapPdfText(disclaimer, regularFont, 6.8, contentWidth - 65, regularSet);
+    footerLines.slice(0, 2).forEach((line, lineIdx) => {
+      p.drawText(line, {
+        x: leftX,
+        y: 30 - lineIdx * 9,
+        size: 6.8,
+        font: regularFont,
+        color: cMuted,
+      });
     });
 
-    p.drawText(`${isVi ? "Trang" : "Page"} ${idx + 1} / ${totalPages}`, {
-      x: leftX + contentWidth - 45,
+    p.drawText(safeReg(`${isVi ? "Trang" : "Page"} ${idx + 1} / ${totalPages}`), {
+      x: leftX + contentWidth - 48,
       y: 28,
       size: 7,
       font: regularFont,
@@ -467,8 +746,8 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     });
 
     p.drawLine({
-      start: { x: leftX, y: 40 },
-      end: { x: leftX + contentWidth, y: 40 },
+      start: { x: leftX, y: 42 },
+      end: { x: leftX + contentWidth, y: 42 },
       thickness: 0.5,
       color: cBorder,
     });

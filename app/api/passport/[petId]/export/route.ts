@@ -1,8 +1,13 @@
 import { createPassportPdf } from "@/modules/passport/pdf";
 import { evaluateRabiesStatus } from "@/modules/passport/share-service";
-import { requireRole } from "@/lib/auth/server";
+import { getOptionalUser, requireRole } from "@/lib/auth/server";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
-import { getPortalDatabase } from "@/lib/portal-store/server-store";
+import {
+  getPortalDatabase,
+  ownerPetToClinicPet,
+  resolveOwnerAccount,
+} from "@/lib/portal-store/server-store";
+import { DEMO_PETS_20 } from "@/modules/demo/hcmc-competition-dataset";
 
 export async function GET(request: Request, context: { params: Promise<{ petId: string }> }) {
   const { petId } = await context.params;
@@ -10,11 +15,9 @@ export async function GET(request: Request, context: { params: Promise<{ petId: 
   const locale = url.searchParams.get("locale") === "en" ? "en" : "vi";
   const sectionsParam = url.searchParams.get("sections");
   const includeOwnerParam = url.searchParams.get("include_owner") === "1";
-
-  const { supabase, userId } = await requireRole(["owner", "clinic_staff", "clinic_admin"], locale);
+  const snapshotParam = url.searchParams.get("snapshot");
 
   let petData: any = null;
-  let records: any[] = [];
   let vaccinations: any[] = [];
   let prescriptions: any[] = [];
   let allergies: any[] = [];
@@ -23,6 +26,10 @@ export async function GET(request: Request, context: { params: Promise<{ petId: 
   let ownerContact: any = undefined;
 
   if (isSupabaseConfigured()) {
+    const { supabase, userId } = await requireRole(
+      ["owner", "clinic_staff", "clinic_admin"],
+      locale
+    );
     const { data: pet, error } = await supabase
       .from("pets")
       .select("id, name, species, breed, birth_date, microchip")
@@ -35,7 +42,6 @@ export async function GET(request: Request, context: { params: Promise<{ petId: 
     }
     petData = pet;
 
-    // Fetch vaccinations
     const { data: vaxList } = await supabase
       .from("vaccinations")
       .select("vaccine_name, code, dose, lot, administered_at, next_due_at, is_demo")
@@ -53,7 +59,6 @@ export async function GET(request: Request, context: { params: Promise<{ petId: 
       clinic: "PawCare Partner Clinic",
     }));
 
-    // Fetch prescriptions
     const { data: rxList } = await supabase
       .from("prescriptions")
       .select("medication_name, dose, started_at, ended_at, instructions")
@@ -69,21 +74,18 @@ export async function GET(request: Request, context: { params: Promise<{ petId: 
       verified: true,
     }));
 
-    // Fetch allergies
     const { data: allergyList } = await supabase
       .from("pet_allergies")
       .select("name, severity, source")
       .eq("pet_id", petId);
     allergies = allergyList ?? [];
 
-    // Fetch conditions
     const { data: condList } = await supabase
       .from("pet_conditions")
       .select("name, status, source")
       .eq("pet_id", petId);
     conditions = condList ?? [];
 
-    // Fetch visits from medical_records
     const { data: recList } = await supabase
       .from("medical_records")
       .select("occurred_at, summary")
@@ -97,7 +99,6 @@ export async function GET(request: Request, context: { params: Promise<{ petId: 
       summary: m.summary,
     }));
 
-    // Audit log
     await supabase.from("audit_logs").insert({
       actor_id: userId,
       pet_id: petId,
@@ -106,10 +107,101 @@ export async function GET(request: Request, context: { params: Promise<{ petId: 
       entity_id: petId,
     });
   } else {
-    // Load from unified persistent portal store first, fallback to demo Mochi
+    const user = await getOptionalUser();
     const portalDb = getPortalDatabase();
-    const storedClinicPet = portalDb.clinicPetRecords[petId];
-    if (storedClinicPet) {
+
+    // 1. Try optional live snapshot passed from Owner or Clinic UI
+    let parsedSnapshot: any = null;
+    if (snapshotParam) {
+      try {
+        parsedSnapshot = JSON.parse(snapshotParam);
+      } catch {}
+    }
+
+    // 2. Resolve from clinicPetRecords, ownerPets, or DEMO_PETS_20
+    let storedClinicPet = portalDb.clinicPetRecords[petId];
+    if (!storedClinicPet && portalDb.ownerPets[petId]) {
+      const op = portalDb.ownerPets[petId];
+      const ownerAcc = resolveOwnerAccount(op.ownerEmail || op.ownerId || user?.email);
+      storedClinicPet = ownerPetToClinicPet(op, undefined, ownerAcc.profile);
+    }
+
+    if (parsedSnapshot && parsedSnapshot.name) {
+      const ownerAcc = resolveOwnerAccount(user?.email || user?.id);
+      const baseClinic = storedClinicPet;
+      petData = {
+        id: parsedSnapshot.id || petId,
+        name: parsedSnapshot.name,
+        species: parsedSnapshot.species || baseClinic?.species || "dog",
+        breed: parsedSnapshot.breed || baseClinic?.breed || "Thú cưng",
+        gender: parsedSnapshot.gender || baseClinic?.gender || "male",
+        birthDate: parsedSnapshot.birthDate || baseClinic?.birthDate || "2024-01-01",
+        weightKg: Number(parsedSnapshot.weightKg) || baseClinic?.weightKg || 4.0,
+        microchip:
+          parsedSnapshot.microchip ||
+          baseClinic?.microchip ||
+          "981098102345678",
+      };
+
+      const rawVaxes = Array.isArray(parsedSnapshot.vaccinations)
+        ? parsedSnapshot.vaccinations
+        : baseClinic?.vaccinations || [];
+      vaccinations = rawVaxes.map((v: any) => ({
+        name: v.name || "Vắc-xin định kỳ",
+        lot: v.lot || v.batchNo || "LOT-2026",
+        administeredAt: v.date || v.adminDate || "2026-10-20",
+        nextDueAt: v.nextDue || "2027-10-20",
+        clinic: v.clinic || "Phòng Khám Thú Y PetCare · Quận 1",
+        vetName: v.veterinarian || "BS. Nguyễn Văn Cường",
+        verified: v.status !== "overdue" && v.status !== "expired",
+      }));
+
+      const rawEncounters = Array.isArray(parsedSnapshot.encounters)
+        ? parsedSnapshot.encounters
+        : baseClinic?.encounters || [];
+      prescriptions = rawEncounters.flatMap((enc: any) =>
+        (enc.prescriptions || []).map((rx: any) => ({
+          name: rx.medication,
+          dose: rx.dosage,
+          instructions: rx.instructions || `${rx.frequency} (${rx.duration})`,
+          startedAt: enc.date,
+          verified: true,
+        }))
+      );
+      visits = rawEncounters.map((enc: any) => ({
+        date: enc.date,
+        clinicName: enc.clinic || "Phòng Khám Thú Y PetCare · Quận 1",
+        summary: `${enc.title}: ${enc.soapNotes?.assessment || ""}`,
+      }));
+
+      const rawAllergies = Array.isArray(parsedSnapshot.allergies)
+        ? parsedSnapshot.allergies
+        : baseClinic?.allergies || [];
+      allergies = rawAllergies.map((a: any) => ({
+        name: typeof a === "string" ? a : a.name,
+        severity: "trung bình",
+        source: "clinic",
+      }));
+
+      const rawConditions = Array.isArray(parsedSnapshot.conditions)
+        ? parsedSnapshot.conditions
+        : parsedSnapshot.medicalHistory
+        ? [parsedSnapshot.medicalHistory]
+        : baseClinic?.conditions || [];
+      conditions = rawConditions.map((c: any) => ({
+        name: typeof c === "string" ? c : c.name,
+        status: "đang kiểm soát",
+        source: "clinic",
+      }));
+
+      if (includeOwnerParam) {
+        ownerContact = {
+          name: parsedSnapshot.owner?.name || baseClinic?.owner.name || ownerAcc.profile.fullName,
+          phone: parsedSnapshot.owner?.phone || baseClinic?.owner.phone || ownerAcc.profile.phone,
+          district: parsedSnapshot.owner?.address || baseClinic?.owner.address || ownerAcc.profile.address,
+        };
+      }
+    } else if (storedClinicPet) {
       petData = {
         id: storedClinicPet.id,
         name: storedClinicPet.name,
@@ -161,70 +253,55 @@ export async function GET(request: Request, context: { params: Promise<{ petId: 
         };
       }
     } else {
+      const demoMatch = DEMO_PETS_20.find((p) => p.id === petId) || DEMO_PETS_20[0];
       petData = {
         id: petId,
-        name: "Mochi",
-        species: "dog",
-        breed: "Corgi Wales Pembroke",
-        gender: "male",
-        birthDate: "2022-03-15",
-        weightKg: 11.5,
-        microchip: "982000412345678",
+        name: demoMatch.name,
+        species: demoMatch.species,
+        breed: demoMatch.breed,
+        gender: demoMatch.gender,
+        birthDate: demoMatch.birthDate,
+        weightKg: demoMatch.weightKg,
+        microchip: demoMatch.microchip,
       };
-
-      vaccinations = [
-        {
-          name: "Vắc-xin phòng dại Rabisin (Boehringer Ingelheim)",
-          lot: "RAB-2026-09",
-          administeredAt: "2026-05-10",
-          nextDueAt: "2027-05-10",
-          clinic: "Phòng khám Thú y Bác Sĩ Tâm · Q3",
-          vetName: "BS. Nguyễn Văn Tâm",
-          verified: true,
-        },
-        {
-          name: "Vanguard Plus 5/CV-L (Phòng 7 bệnh chó)",
-          lot: "VG-2026-44",
-          administeredAt: "2026-05-10",
-          nextDueAt: "2027-05-10",
-          clinic: "Phòng khám Thú y Bác Sĩ Tâm · Q3",
-          verified: true,
-        },
-        {
-          name: "Xổ giun Drontal Plus",
-          lot: "DR-55",
-          administeredAt: "2026-08-01",
-          nextDueAt: "2026-11-01",
-          clinic: "Tự thực hiện tại nhà",
-          verified: false,
-        },
-      ];
-
-      prescriptions = [
-        {
-          name: "Bravecto 10-20kg (Trị ve rận & ghẻ Demodex)",
-          dose: "1 viên nhai",
-          instructions: "Uống sau bữa ăn, bảo vệ trong 12 tuần",
-          startedAt: "2026-08-15",
-          verified: true,
-        },
-      ];
-
-      allergies = [{ name: "Dị ứng đạm bò", severity: "trung bình", source: "clinic" }];
-      conditions = [{ name: "Viêm da tiếp xúc cơ địa", status: "đang kiểm soát", source: "clinic" }];
+      vaccinations = (demoMatch.vaccinations || []).map((v) => ({
+        name: v.name,
+        lot: v.lot,
+        administeredAt: v.date,
+        nextDueAt: v.nextDue,
+        clinic: v.clinic,
+        vetName: v.vetName,
+        verified: v.verified,
+      }));
+      prescriptions = (demoMatch.prescriptions || []).map((rx) => ({
+        name: rx.name,
+        dose: rx.dose,
+        instructions: rx.instructions,
+        startedAt: rx.startedAt,
+        verified: rx.verified,
+      }));
+      allergies = (demoMatch.allergies || []).map((a) => ({
+        name: a,
+        severity: "trung bình",
+        source: "clinic",
+      }));
+      conditions = (demoMatch.conditions || []).map((c) => ({
+        name: c,
+        status: "đang kiểm soát",
+        source: "clinic",
+      }));
       visits = [
         {
-          date: "2026-05-10",
-          clinicName: "Phòng khám Thú y Bác Sĩ Tâm · Quận 3",
-          summary: "Tiêm chủng định kỳ vắc-xin 7 bệnh và phòng dại. Tình trạng sức khỏe tốt, thân nhiệt 38.4°C.",
+          date: "2026-10-20",
+          clinicName: "Phòng Khám Thú Y PetCare · Quận 1",
+          summary: "Khám lâm sàng định kỳ và đối chiếu sổ tiêm chủng điện tử. Thể trạng ổn định.",
         },
       ];
-
       if (includeOwnerParam) {
         ownerContact = {
-          name: "Nguyễn Văn An",
-          phone: "0908 123 456",
-          district: "Quận 3, TP.HCM",
+          name: demoMatch.ownerName,
+          phone: demoMatch.ownerPhone,
+          district: demoMatch.ownerDistrict,
         };
       }
     }
@@ -258,10 +335,12 @@ export async function GET(request: Request, context: { params: Promise<{ petId: 
     verificationUrl: `${url.origin}/${locale}/records/verify/${petId}`,
   });
 
+  const safeFilename = `pawcare-passport-${petId.replace(/[^a-zA-Z0-9_-]/g, "") || "record"}.pdf`;
+
   return new Response(pdfBytes as BodyInit, {
     headers: {
       "content-type": "application/pdf",
-      "content-disposition": `attachment; filename="pawcare-passport-${petId}.pdf"`,
+      "content-disposition": `attachment; filename="${safeFilename}"`,
       "cache-control": "private, no-store",
     },
   });

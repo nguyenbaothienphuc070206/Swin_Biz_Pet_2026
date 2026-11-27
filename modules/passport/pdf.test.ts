@@ -1,8 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import fontkit from "@pdf-lib/fontkit";
 
 vi.mock("server-only", () => ({}));
 
-import { createPassportPdf, type PassportPdfInput } from "./pdf";
+import { createPassportPdf, sanitizePdfText, type PassportPdfInput } from "./pdf";
 
 describe("pdf: Server-side Pet Health Record PDF Generator", () => {
   const sampleInput: PassportPdfInput = {
@@ -120,6 +123,33 @@ describe("pdf: Server-side Pet Health Record PDF Generator", () => {
     };
     const bytes = await createPassportPdf(expiredInput);
     expect(bytes.length).toBeGreaterThan(5000);
+  });
+
+  it("embeds full Unicode Latin + Vietnamese fonts with complete A-Z, a-z, 0-9, and diacritic glyphs", async () => {
+    const requiredChars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" +
+      "SỔ Y BẠ & HỒ SƠ SỨC KHỎE ĐIỆN TỬ ĐÃ TIÊM PHÒNG DẠI HỢP LỆ " +
+      "Vắc-xin Số lô Ngày tiêm Tái chủng Cơ sở Bác sĩ Nguyễn Văn Cường " +
+      "Trần Anh Khoa Lê Hoàng Yến Phạm Minh Đức Nguyễn Thu Trang • · | ( ) [ ] / - : #";
+
+    for (const file of [
+      "be-vietnam-pro-vietnamese-400.woff",
+      "be-vietnam-pro-vietnamese-700.woff",
+    ]) {
+      const buf = await readFile(join(process.cwd(), "public", "fonts", file));
+      expect(buf.byteLength).toBeGreaterThan(100_000);
+      const font = fontkit.create(buf);
+      expect(font.numGlyphs).toBeGreaterThan(500);
+
+      const missing = [...new Set([...requiredChars])].filter(
+        (ch) => !font.hasGlyphForCodePoint(ch.codePointAt(0)!)
+      );
+      expect(missing).toEqual([]);
+    }
+
+    // Verify NFD -> NFC normalization & dingbat sanitization
+    const nfd = "Sô\u0309 Y Ba\u0323 ✓ ⚠";
+    expect(sanitizePdfText(nfd)).toBe("Sổ Y Bạ [OK] [!]");
   });
 });
 
