@@ -9,12 +9,123 @@ import type { PetRecord } from "@/components/owner/pet-passport-view";
 import type { CarePlanProposal, CareTaskItem } from "@/modules/careplans/types";
 import { getFallbackClinics, type ClinicDetail } from "@/modules/clinics/mock-clinics";
 
+// ==================== PERSON & OWNER NAMES ====================
+const PERSON_NAME_PAIRS: Array<[string, string]> = [
+  ["Lê Hoàng Yến", "Le Hoang Yen"],
+  ["Trần Anh Khoa", "Tran Anh Khoa"],
+  ["Phạm Minh Đức", "Pham Minh Duc"],
+  ["Nguyễn Thu Trang", "Nguyen Thu Trang"],
+  ["Nguyễn Văn An", "Nguyen Van An"],
+  ["Lê Thị Mai", "Le Thi Mai"],
+  ["Đặng Hữu Phúc", "Dang Huu Phuc"],
+  ["Hoàng Gia Bảo", "Hoang Gia Bao"],
+  ["Vũ Hải Yến", "Vu Hai Yen"],
+  ["Dương Quốc Anh", "Duong Quoc Anh"],
+  ["Ngô Nhật Linh", "Ngo Nhat Linh"],
+  ["Chủ nuôi PawCare", "PawCare Pet Parent"],
+  ["Chủ nuôi", "Pet Parent"],
+];
+
+export function localizePersonName(name?: string, isEn: boolean = false): string {
+  if (!name) return "";
+  const trimmed = name.trim();
+  for (const [vi, en] of PERSON_NAME_PAIRS) {
+    if (trimmed.toLowerCase() === vi.toLowerCase() || trimmed.toLowerCase() === en.toLowerCase()) {
+      return isEn ? en : vi;
+    }
+  }
+  return trimmed;
+}
+
+export function localizePetName(name?: string, isEn: boolean = false): string {
+  if (!name) return "";
+  const trimmed = name.trim();
+  if (isEn) {
+    if (trimmed === "Bơ") return "Bo";
+    if (trimmed === "Bé Bơ") return "Bo";
+    if (trimmed === "Gấu") return "Gau";
+    if (trimmed === "Đậu Đậu") return "Dau Dau";
+    return trimmed;
+  } else {
+    if (trimmed === "Bo") return "Bơ";
+    if (trimmed === "Gau") return "Gấu";
+    if (trimmed === "Dau Dau") return "Đậu Đậu";
+    return trimmed;
+  }
+}
+
+// ==================== REMINDERS & WEIGHT NOTES ====================
+const REMINDER_TITLE_PAIRS: Array<[string, string]> = [
+  ["Tiêm nhắc lại Mũi dại định kỳ hàng năm", "Annual Rabies Booster Vaccination"],
+  ["Tẩy giun & nhỏ gáy phòng ve rận Q4", "Quarterly Deworming & Flea Preventative"],
+  ["Vệ sinh răng miệng & Khám tổng quát", "Dental Cleaning & General Health Checkup"],
+  ["Mũi nhắc 5 bệnh chó mèo cơ bản", "DHPPi Core Vaccine 5-in-1"],
+  ["Tắm trị liệu bằng sữa tắm Malaseb dược liệu 2 lần/tuần", "Therapeutic bath with Malaseb medicinal shampoo twice weekly"],
+  ["Tái khám soi kính hiển vi tế bào da & kiểm tra độ ngứa", "Follow-up microscopic skin cytology & itch level evaluation"],
+  ["Uống viên nhai NexGard Spectra ngừa giun tim & ve rận", "Monthly NexGard Spectra heartworm & flea preventative chewable"],
+  ["Tái khám thực hiện lấy cao răng siêu âm dưới gây mê", "Follow-up ultrasonic dental scaling under anesthesia"],
+  ["Tái khám siêu âm bàng quang & xét nghiệm nước tiểu", "Urinary tract & bladder ultrasound follow-up check"],
+];
+
+export function localizeReminder<
+  T extends { id: string; petName: string; title: string; dueDate: string; category: any; completed: boolean }
+>(rem: T, isEn: boolean = false, activeOwnerPetName?: string): T {
+  let rawTitle = (rem.title || "").trim();
+  for (const [vi, en] of REMINDER_TITLE_PAIRS) {
+    if (rawTitle.toLowerCase() === vi.toLowerCase() || rawTitle.toLowerCase() === en.toLowerCase()) {
+      rawTitle = isEn ? en : vi;
+      break;
+    }
+  }
+
+  let rawPetName = (rem.petName || "").trim();
+  if (
+    activeOwnerPetName &&
+    (rawPetName === "Milo" || rawPetName === "Luna" || !rawPetName)
+  ) {
+    rawPetName = activeOwnerPetName;
+  }
+  const localizedPet = localizePetName(rawPetName, isEn);
+
+  return {
+    ...rem,
+    petName: localizedPet,
+    title: rawTitle,
+  };
+}
+
+const WEIGHT_NOTE_PAIRS: Array<[string, string]> = [
+  [
+    "Cân nặng ghi nhận tại Phòng Khám Thú Y PetCare · Quận 1",
+    "Weight recorded at PetCare Veterinary Clinic · District 1",
+  ],
+  ["Cân nặng ban đầu khi tạo hồ sơ", "Initial weight at registration"],
+  ["Khởi tạo hồ sơ", "Initial health profile"],
+  ["Khám định kỳ gần nhất", "Recent routine check"],
+];
+
+export function localizeWeightNote(note?: string, isEn: boolean = false): string {
+  if (!note) return "";
+  const trimmed = note.trim();
+  for (const [vi, en] of WEIGHT_NOTE_PAIRS) {
+    if (trimmed.toLowerCase() === vi.toLowerCase() || trimmed.toLowerCase() === en.toLowerCase()) {
+      return isEn ? en : vi;
+    }
+  }
+  return trimmed;
+}
+
 // ==================== BREED TRANSLATIONS ====================
 const BREED_PAIRS: Array<[string, string]> = [
+  ["Corgi Wales Pembroke", "Pembroke Welsh Corgi"],
   ["Corgi Wales", "Welsh Corgi"],
   ["Corgi", "Welsh Corgi"],
+  ["Mèo Anh lông ngắn (Golden)", "British Shorthair (Golden)"],
   ["Mèo Anh lông ngắn", "British Shorthair"],
   ["Mèo Anh lông dài", "British Longhair"],
+  ["Toy Poodle (Nâu đỏ)", "Red Toy Poodle"],
+  ["Poodle Toy", "Toy Poodle"],
+  ["Mèo Ta tam thể", "Calico Domestic Cat"],
   ["Mèo nhà", "Domestic Cat"],
   ["Mèo cưng", "Domestic Cat"],
   ["Chó nhà", "Domestic Dog"],
@@ -255,9 +366,17 @@ export function localizeAge(ageStr?: string, isEn: boolean = false): string {
 
 // ==================== ALLERGIES & CONDITIONS ====================
 const ALLERGY_PAIRS: Array<[string, string]> = [
+  ["Dị ứng đạm gia cầm (gà)", "Poultry / chicken protein hypersensitivity"],
+  ["Dễ viêm da cơ địa theo mùa", "Seasonal environmental pruritus"],
+  ["Chưa ghi nhận tiền sử dị ứng thuốc hay thức ăn", "No known drug or food allergies"],
+  ["Không ghi nhận dị ứng thuốc", "No known drug allergies"],
+  ["Kháng sinh nhóm Penicillin", "Penicillin-class Antibiotics"],
+  ["Kháng sinh Penicillin", "Penicillin Antibiotic"],
+  ["Hải sản có vỏ", "Shellfish"],
+  ["Nhạy cảm với hải sản tươi", "Fresh seafood sensitivity"],
+  ["Dị ứng đạm bò", "Beef protein allergy"],
   ["Thịt bò (Beef)", "Beef"],
   ["Thịt bò", "Beef"],
-  ["Kháng sinh Penicillin", "Penicillin Antibiotic"],
   ["Penicillin", "Penicillin Antibiotic"],
   ["Hải sản", "Seafood"],
   ["Thịt gà", "Chicken"],
@@ -304,6 +423,38 @@ export function localizeCondition(cond: string, isEn: boolean = false): string {
   const lower = cond.trim().toLowerCase();
 
   const COND_MAP: Record<string, { vi: string; en: string }> = {
+    "viêm da dị ứng cấp kèm trầy xước sau tai trái": {
+      vi: "Viêm da dị ứng cấp kèm trầy xước sau tai trái",
+      en: "Allergic contact dermatitis (excoriation behind left pinna)",
+    },
+    "allergic contact dermatitis (excoriation behind left pinna)": {
+      vi: "Viêm da dị ứng cấp kèm trầy xước sau tai trái",
+      en: "Allergic contact dermatitis (excoriation behind left pinna)",
+    },
+    "thể trạng ổn định. duy trì vệ sinh răng miệng định kỳ": {
+      vi: "Thể trạng ổn định. Duy trì vệ sinh răng miệng định kỳ.",
+      en: "Healthy canine companion. Routine dental care maintenance.",
+    },
+    "healthy canine companion": {
+      vi: "Thể trạng ổn định. Duy trì vệ sinh răng miệng định kỳ.",
+      en: "Healthy canine companion. Routine dental care maintenance.",
+    },
+    "vôi răng độ 2 cần vệ sinh siêu âm & dự phòng giun tim": {
+      vi: "Vôi răng độ 2 cần vệ sinh siêu âm & dự phòng giun tim",
+      en: "Grade 2 dental tartar requiring ultrasonic scaling & heartworm prevention",
+    },
+    "grade 2 dental tartar": {
+      vi: "Vôi răng độ 2 cần vệ sinh siêu âm & dự phòng giun tim",
+      en: "Grade 2 dental tartar requiring ultrasonic scaling & heartworm prevention",
+    },
+    "hậu phẫu triệt sản ổn định, dự phòng búi lông & sỏi tiết niệu": {
+      vi: "Hậu phẫu triệt sản ổn định, dự phòng búi lông & sỏi tiết niệu",
+      en: "Post-spay recovery stable; hairball & urinary stone prevention",
+    },
+    "post-spay recovery stable": {
+      vi: "Hậu phẫu triệt sản ổn định, dự phòng búi lông & sỏi tiết niệu",
+      en: "Post-spay recovery stable; hairball & urinary stone prevention",
+    },
     "viêm da cơ địa": { vi: "Viêm da cơ địa", en: "Atopic Dermatitis" },
     "atopic dermatitis": { vi: "Viêm da cơ địa", en: "Atopic Dermatitis" },
     "viêm da dị ứng tiếp xúc": { vi: "Viêm da dị ứng tiếp xúc", en: "Contact Allergy Dermatitis" },
@@ -312,6 +463,7 @@ export function localizeCondition(cond: string, isEn: boolean = false): string {
     "neutered": { vi: "Đã triệt sản", en: "Neutered / Spayed" },
     "spayed": { vi: "Đã triệt sản", en: "Neutered / Spayed" },
     "khỏe mạnh": { vi: "Khỏe mạnh", en: "Healthy" },
+    "sức khỏe ổn định": { vi: "Sức khỏe ổn định", en: "Stable Health" },
     "healthy": { vi: "Khỏe mạnh", en: "Healthy" },
     "sỏi tiết niệu": { vi: "Tiền sử sỏi tiết niệu", en: "History of Urinary Stones" },
     "urinary stones": { vi: "Tiền sử sỏi tiết niệu", en: "History of Urinary Stones" },
@@ -330,6 +482,24 @@ export function localizeVaccineName(vaxName: string, isEn: boolean = false): str
   if (!vaxName) return "";
   const lower = vaxName.toLowerCase();
 
+  if (lower.includes("purevax")) {
+    return isEn ? "Purevax RCPCh (4-in-1 Feline Core)" : "Purevax RCPCh (4-trong-1 Mèo)";
+  }
+  if (lower.includes("felocell")) {
+    return isEn ? "Felocell 4-in-1 (Feline Core)" : "Felocell 4-trong-1 (Mũi sơ sinh)";
+  }
+  if (lower.includes("vanguard")) {
+    return isEn ? "Vanguard Plus 5/L (7-in-1 Canine Core)" : "Vanguard Plus 5/L (7-trong-1 Chó)";
+  }
+  if (lower.includes("nobivac kc") || lower.includes("bordetella")) {
+    return isEn ? "Nobivac KC (Bordetella Intranasal)" : "Nobivac KC (Ngừa ho cũi chó)";
+  }
+  if (lower.includes("nobivac rabies")) {
+    return isEn ? "Rabies Vaccine (Nobivac Rabies)" : "Vắc-xin Dại (Nobivac Rabies)";
+  }
+  if (lower.includes("rabisin")) {
+    return isEn ? "Rabies Vaccine (Rabisin)" : "Vắc-xin Dại (Rabisin)";
+  }
   if (lower.includes("rabies") || lower.includes("dại")) {
     return isEn ? "Rabies Vaccine (Annual)" : "Vắc-xin Dại (Rabies)";
   }
@@ -863,6 +1033,8 @@ const SERVICE_PAIRS: Array<{ vi: string; en: string }> = [
   { vi: "ProHeart 12 Heartworm Prevention Booster", en: "ProHeart 12 Heartworm Prevention Booster" },
   { vi: "Khám da liễu & tẩy giun", en: "Dermatology Exam & Deworming" },
   { vi: "Dermatology Exam & Deworming", en: "Dermatology Exam & Deworming" },
+  { vi: "Tái khám sau triệt sản & siêu âm tiết niệu", en: "Post-Spay Follow-up & Urinary Ultrasound" },
+  { vi: "Post-Spay Follow-up & Urinary Ultrasound", en: "Post-Spay Follow-up & Urinary Ultrasound" },
   { vi: "Tái khám sau triệt sản", en: "Post-Neuter Follow-up Checkup" },
   { vi: "Post-Neuter Follow-up Checkup", en: "Post-Neuter Follow-up Checkup" },
   { vi: "Khám & tiêm chủng", en: "Exam & Vaccination" },
@@ -953,6 +1125,8 @@ export function localizeAppointment(apt: Appointment, isEn: boolean = false): Ap
         localizedNotes = "Clinical exam & vaccination completed (Rabies + Vanguard Plus 5/L). Temperature 38.5°C, stable vitals. Digital immunization certificate issued.";
       } else if (apt.notes.includes("Từ chối lịch hẹn: Phòng mổ kín lịch") || apt.notes.includes("Appointment declined: Surgery suite fully occupied")) {
         localizedNotes = "Appointment declined: Surgery suite fully occupied with midday emergency procedures. Clinic staff called owner to reschedule to 09:00 AM tomorrow (fast 8 hours before surgery).";
+      } else if (apt.notes.includes("Lịch hẹn ưu tiên gói Premium") || apt.notes.includes("Priority Premium appointment confirmed")) {
+        localizedNotes = "Priority Premium appointment confirmed by PetCare Veterinary Clinic · District 1.";
       } else if (apt.notes.includes("Đặt khám định kỳ & tiêm phòng cho 2 bé")) {
         localizedNotes = "Pre-booked routine visit for 2 companions";
       }
@@ -963,6 +1137,8 @@ export function localizeAppointment(apt: Appointment, isEn: boolean = false): Ap
         localizedNotes = "Đã hoàn thành khám lâm sàng & tiêm phòng vắc-xin Rabies + Vanguard Plus 5/L. Thân nhiệt 38.5°C, sức khỏe ổn định. Cấp chứng chỉ tiêm chủng điện tử thành công.";
       } else if (apt.notes.includes("Appointment declined: Surgery suite fully occupied") || apt.notes.includes("Từ chối lịch hẹn: Phòng mổ kín lịch")) {
         localizedNotes = "Từ chối lịch hẹn: Phòng mổ kín lịch phẫu thuật cấp cứu trưa nay. Phòng khám đã liên hệ chủ nuôi dời sang 09:00 sáng mai và dặn nhịn ăn 8 tiếng trước mổ.";
+      } else if (apt.notes.includes("Priority Premium appointment confirmed") || apt.notes.includes("Lịch hẹn ưu tiên gói Premium")) {
+        localizedNotes = "Lịch hẹn ưu tiên gói Premium đã được Phòng Khám Thú Y PetCare · Quận 1 xác nhận.";
       } else if (apt.notes.includes("Pre-booked routine visit for 2 companions")) {
         localizedNotes = "Đặt khám định kỳ & tiêm phòng cho 2 bé";
       }
@@ -973,6 +1149,7 @@ export function localizeAppointment(apt: Appointment, isEn: boolean = false): Ap
     ...apt,
     petName: localizedPetName,
     pets: localizedPets,
+    ownerName: apt.ownerName ? localizePersonName(apt.ownerName, isEn) : apt.ownerName,
     clinicName: localizeClinicName(apt.clinicName, isEn),
     clinicAddress: localizeClinicAddress(apt.clinicAddress, isEn),
     doctor: localizeDoctorName(apt.doctor, isEn),
@@ -991,8 +1168,9 @@ export function localizePetRecord(pet: PetRecord, isEn: boolean = false): PetRec
 
   return {
     ...pet,
-    name: isEn ? (pet.name === "Bơ" ? "Bo" : pet.name) : (pet.name === "Bo" ? "Bơ" : pet.name),
+    name: localizePetName(pet.name, isEn),
     breed: localizeBreed(pet.breed, pet.species, isEn),
+    medicalHistory: pet.medicalHistory ? localizeCondition(pet.medicalHistory, isEn) : pet.medicalHistory,
     allergies: (pet.allergies || []).map((al) => localizeAllergy(al, isEn)),
     conditions: (pet.conditions || []).map((cd) => localizeCondition(cd, isEn)),
     vaccinations: localizedVaccinations,
@@ -1009,6 +1187,14 @@ const PLAN_DIAGNOSES: Record<string, { vi: string; en: string }> = {
     vi: "Kế hoạch quản lý dinh dưỡng kiểm soát búi lông & phòng ngừa sỏi tiết niệu",
     en: "Nutritional management protocol for hairball control & urinary stones prevention",
   },
+  "plan-petcare-03": {
+    vi: "Phác đồ duy trì miễn dịch xuất cảnh & chăm sóc nha khoa dự phòng",
+    en: "International travel immunity maintenance & preventive dental care protocol",
+  },
+  "plan-petcare-04": {
+    vi: "Phác đồ điều trị viêm nướu tiền phẫu & dự phòng giun tim (Lưu ý dị ứng Penicillin)",
+    en: "Pre-surgical gingivitis treatment & heartworm prevention (Note: Penicillin allergy)",
+  },
 };
 
 const PLAN_DIET: Record<string, { vi: string; en: string }> = {
@@ -1020,6 +1206,14 @@ const PLAN_DIET: Record<string, { vi: string; en: string }> = {
     vi: "Bổ sung gel tiêu búi lông 2 lần/tuần. Duy trì ít nhất 2 bát nước sạch tại các góc nhà để khuyến khích uống nước.",
     en: "Provide hairball relief gel twice weekly. Keep at least 2 clean water bowls in corner areas to encourage hydration.",
   },
+  "plan-petcare-03": {
+    vi: "Thức ăn hạt cá hồi không ngũ cốc + 1 que gặm sạch răng mỗi tối.",
+    en: "Grain-free salmon kibble formula + 1 enzymatic dental chew every evening.",
+  },
+  "plan-petcare-04": {
+    vi: "Ăn thức ăn mềm hoặc hạt ngâm ấm, tránh xương cứng gây tổn thương nướu.",
+    en: "Feed soft wet food or warm-soaked kibble; avoid hard bones that irritate gums.",
+  },
 };
 
 const PLAN_NOTES: Record<string, { vi: string; en: string }> = {
@@ -1030,6 +1224,14 @@ const PLAN_NOTES: Record<string, { vi: string; en: string }> = {
   "plan-petcare-02": {
     vi: "Chải lông tơ hàng ngày để giảm nuốt lông rụng. Theo dõi tần suất đi vệ sinh, báo cho bác sĩ nếu thấy dấu hiệu tiểu rắt.",
     en: "Brush undercoat daily to minimize ingested loose fur. Monitor urination frequency and notify the vet if straining is observed.",
+  },
+  "plan-petcare-03": {
+    vi: "Duy trì NexGard Spectra định kỳ ngày 1 hàng tháng để bảo vệ giun tim và ký sinh trùng.",
+    en: "Maintain monthly NexGard Spectra on the 1st of every month for heartworm and parasite protection.",
+  },
+  "plan-petcare-04": {
+    vi: "CẢNH BÁO Y KHOA: Bé dị ứng kháng sinh nhóm Penicillin. Chỉ sử dụng gel sát khuẩn tại chỗ theo toa.",
+    en: "CLINICAL ALERT: Patient is allergic to Penicillin-class antibiotics. Use prescribed topical antiseptic gel only.",
   },
 };
 
@@ -1207,11 +1409,74 @@ const TASK_MAP: Record<string, { title: { vi: string; en: string }; notes: { vi:
       en: "Keep bladder moderately full 1-2 hours prior to scan.",
     },
   },
+  // Plan 3: Mochi
+  "task-mochi-d1": {
+    title: {
+      vi: "Chải răng hoặc dùng que gặm enzyme làm sạch mảng bám",
+      en: "Brush teeth or give enzymatic dental chew to remove plaque",
+    },
+    notes: {
+      vi: "Giúp ngăn ngừa cao răng tái phát sau khi lấy cao răng siêu âm.",
+      en: "Prevents tartar buildup after ultrasonic dental scaling.",
+    },
+  },
+  "task-mochi-w1": {
+    title: {
+      vi: "Kiểm tra tai, mắt và chải lông bằng lược mềm",
+      en: "Inspect ears and eyes, and brush coat with a soft slicker brush",
+    },
+    notes: {
+      vi: "Giữ bộ lông Poodle thông thoáng, tránh rối lông vùng tai.",
+      en: "Keeps Poodle coat ventilated and prevents matting around the ears.",
+    },
+  },
+  "task-mochi-m1": {
+    title: {
+      vi: "Uống viên nhai NexGard Spectra ngừa giun tim & ve rận",
+      en: "Administer NexGard Spectra chewable for heartworm & flea prevention",
+    },
+    notes: {
+      vi: "Uống sau ăn no.",
+      en: "Administer after a full meal.",
+    },
+  },
+  // Plan 4: Lu
+  "task-lu-d1": {
+    title: {
+      vi: "Bôi gel sát khuẩn nướu Orozyme dọc hai bên hàm",
+      en: "Apply Orozyme antiseptic dental gel along both gumlines",
+    },
+    notes: {
+      vi: "Không cho uống nước trong 30 phút sau khi bôi gel.",
+      en: "Withhold water for 30 minutes after applying the gel.",
+    },
+  },
+  "task-lu-w1": {
+    title: {
+      vi: "Kiểm tra hơi thở và màu sắc nướu răng",
+      en: "Monitor breath odor and gumline color weekly",
+    },
+    notes: {
+      vi: "Nếu nướu chảy máu hoặc sưng đỏ, nhắn tin ngay cho bác sĩ qua khung chat.",
+      en: "If gums bleed or appear swollen, message the vet immediately via chat.",
+    },
+  },
+  "task-lu-m1": {
+    title: {
+      vi: "Tái khám thực hiện lấy cao răng siêu âm dưới gây mê",
+      en: "Follow-up visit for ultrasonic dental scaling under anesthesia",
+    },
+    notes: {
+      vi: "Nhịn ăn 8 tiếng trước khi đến phòng khám.",
+      en: "Fast for 8 hours prior to visiting the clinic.",
+    },
+  },
 };
 
 const SCHEDULE_DESC_MAP: Record<string, { vi: string; en: string }> = {
   "Mỗi sáng cùng thức ăn": { vi: "Mỗi sáng cùng thức ăn", en: "Every morning with food" },
   "Mỗi tối sau khi đi dạo ngoài trời": { vi: "Mỗi tối sau khi đi dạo ngoài trời", en: "Every evening after outdoor walk" },
+  "Mỗi tối sau bữa ăn": { vi: "Mỗi tối sau bữa ăn", en: "Every evening after dinner" },
   "Sáng 60g · Tối 60g": { vi: "Sáng 60g · Tối 60g", en: "Morning 60g · Evening 60g" },
   "Thứ 4 & Chủ nhật": { vi: "Thứ 4 & Chủ nhật", en: "Wednesday & Sunday" },
   "Chủ nhật hàng tuần": { vi: "Chủ nhật hàng tuần", en: "Every Sunday" },
@@ -1225,6 +1490,7 @@ const SCHEDULE_DESC_MAP: Record<string, { vi: string; en: string }> = {
   "Thứ 7 hàng tuần": { vi: "Thứ 7 hàng tuần", en: "Every Saturday" },
   "Ngày 01 hàng tháng": { vi: "Ngày 01 hàng tháng", en: "1st of every month" },
   "Ngày 20/11/2026": { vi: "Ngày 20/11/2026", en: "Nov 20, 2026" },
+  "Lịch hẹn sáng 09:00": { vi: "Lịch hẹn sáng 09:00", en: "09:00 AM scheduled visit" },
 };
 
 export function localizeCareFrequency(freq?: string, isEn: boolean = false): string {
@@ -1282,7 +1548,8 @@ export function localizeCarePlan(plan: CarePlanProposal, isEn: boolean = false):
 
   return {
     ...plan,
-    petName: isEn ? (plan.petName === "Bơ" ? "Bo" : plan.petName) : (plan.petName === "Bo" ? "Bơ" : plan.petName),
+    petName: localizePetName(plan.petName, isEn),
+    ownerName: localizePersonName(plan.ownerName, isEn),
     clinicName: localizeClinicName(plan.clinicName, isEn),
     doctorName: localizeDoctorName(plan.doctorName, isEn),
     diagnosis,

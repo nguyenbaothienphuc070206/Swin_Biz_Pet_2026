@@ -33,7 +33,7 @@ import {
 import { AddPetForm } from "./add-pet-form";
 import { BackButton } from "@/components/ui/back-button";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
-import { localizePetRecord } from "@/modules/i18n/localize-data";
+import { localizePetRecord, localizeWeightNote } from "@/modules/i18n/localize-data";
 import { useOwnerPlan } from "@/lib/hooks/use-owner-plan";
 import { PetShareModal } from "@/components/passport/pet-share-modal";
 
@@ -175,7 +175,12 @@ export function PetPassportView({ locale }: { locale: string }) {
             parsed.some((p: any) => p.note === "Khởi tạo hồ sơ" || p.note === "Initial health profile") &&
             parsed.some((p: any) => p.note === "Recent routine check" || p.note === "Khám định kỳ gần nhất");
           if (!isOldDummySet) {
-            setWeightLogs(parsed);
+            setWeightLogs(
+              parsed.map((item: WeightLogEntry) => ({
+                ...item,
+                note: item.note ? localizeWeightNote(item.note, locale === "en") : item.note,
+              }))
+            );
             return;
           }
         }

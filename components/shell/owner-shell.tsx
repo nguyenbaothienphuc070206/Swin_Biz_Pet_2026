@@ -39,6 +39,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { LocaleSwitcher } from "./locale-switcher";
 import { useOwnerPlan } from "@/lib/hooks/use-owner-plan";
 import { PortalSyncBridge } from "./portal-sync-bridge";
+import { localizeReminder, localizePetName } from "@/modules/i18n/localize-data";
 
 interface ShellReminderItem {
   id: string;
@@ -160,18 +161,34 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
   const [notificationFilter, setNotificationFilter] = useState<"all" | "pending" | "completed">("all");
 
   useEffect(() => {
+    const getOwnerPrimaryPetName = (): string => {
+      try {
+        const storedPets = localStorage.getItem("pawcare-user-pets");
+        if (storedPets) {
+          const parsedPets = JSON.parse(storedPets);
+          if (Array.isArray(parsedPets) && parsedPets[0]?.name) {
+            return localizePetName(parsedPets[0].name, isEn);
+          }
+        }
+      } catch {}
+      return isEn ? "Bo" : "Bơ";
+    };
+
     const loadReminders = () => {
+      const primaryPet = getOwnerPrimaryPetName();
       try {
         const stored = localStorage.getItem("pawcare-care-reminders");
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setReminders(parsed);
+            setReminders(parsed.map((r) => localizeReminder(r, isEn, primaryPet)));
             return;
           }
         }
       } catch {}
-      const defaults = getDefaultReminders(isEn);
+      const defaults = getDefaultReminders(isEn).map((r) =>
+        localizeReminder(r, isEn, primaryPet)
+      );
       setReminders(defaults);
       try {
         localStorage.setItem("pawcare-care-reminders", JSON.stringify(defaults));
@@ -180,9 +197,11 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
 
     loadReminders();
     window.addEventListener("pawcare-reminders-updated", loadReminders);
+    window.addEventListener("pawcare-pets-updated", loadReminders);
     window.addEventListener("storage", loadReminders);
     return () => {
       window.removeEventListener("pawcare-reminders-updated", loadReminders);
+      window.removeEventListener("pawcare-pets-updated", loadReminders);
       window.removeEventListener("storage", loadReminders);
     };
   }, [isEn]);

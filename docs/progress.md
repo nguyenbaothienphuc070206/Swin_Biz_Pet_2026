@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-28 — Complete Bilingual (VI ↔ EN) Dynamic Data Localization for Reminders & Paired Records
+
+- Added `localizeReminder`, `localizePersonName`, `localizePetName`, and `localizeWeightNote` in `modules/i18n/localize-data.ts` and expanded `BREED_PAIRS`, `ALLERGY_PAIRS`, `localizeCondition`, `localizeVaccineName`, `SERVICE_PAIRS`, `localizeAppointment`, `PLAN_DIAGNOSES`, `PLAN_DIET`, `PLAN_NOTES`, `TASK_MAP`, and `SCHEDULE_DESC_MAP` to cover all 4 paired Premium Owner accounts (`Lê Hoàng Yến · Bơ`, `Trần Anh Khoa · Mochi`, `Phạm Minh Đức · Lu`, `Nguyễn Thu Trang · Miu Miu`).
+- Updated `OwnerShell` (`components/shell/owner-shell.tsx`) and `PersonalSettingsView` (`components/settings/personal-settings-view.tsx`) so Care Reminders & Alerts in the top bell dropdown and settings tab dynamically translate stored reminder titles between Vietnamese and English and bind to the logged-in owner's actual pet name instead of hardcoded `"Milo"` / `"Luna"`.
+- Wired `localizePersonName`, `localizeCondition`, `localizeWeightNote`, seed chat refresh, and clinic record localization across `OwnerHomeView`, `PetPassportView`, `CarePlansView`, `ClinicHomeView`, and `ClinicPetRecordsView`.
+- Added unit tests in `modules/i18n/localize-data.test.ts` verifying bi-directional reminder, person name, and weight note localization.
+
 ## 2026-11-27 — Fix Pet Health Passport PDF Export Missing Latin Glyphs
 
 - Root cause: `public/fonts/be-vietnam-pro-vietnamese-400.woff` and `be-vietnam-pro-vietnamese-700.woff` were previously 6 KB CSS `unicode-range` subset files containing only Vietnamese accented characters (plus `A`), causing `pdf-lib` to drop all Basic Latin characters (`B-Z`, `a-z`, `0-9`) when rendering exported PDFs.

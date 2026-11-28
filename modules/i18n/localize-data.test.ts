@@ -16,6 +16,9 @@ import {
   localizeAppointment,
   localizePetRecord,
   localizeCarePlan,
+  localizeReminder,
+  localizePersonName,
+  localizeWeightNote,
 } from "./localize-data";
 import type { ClinicDetail } from "@/modules/clinics/mock-clinics";
 import type { Appointment } from "@/components/owner/appointments-manager";
@@ -209,5 +212,37 @@ describe("Dynamic Multi-Language Data Localizer", () => {
     expect(enClinic.services[0].description).toBe(
       "Relaxing massage, collagen conditioning, and adorable styling for dogs and cats."
     );
+  });
+
+  it("localizes reminders, owner names, and weight notes bi-directionally", () => {
+    const viReminder = {
+      id: "rem-1",
+      petName: "Milo",
+      title: "Tiêm nhắc lại Mũi dại định kỳ hàng năm",
+      dueDate: "2026-11-15",
+      category: "vaccine" as const,
+      completed: false,
+    };
+
+    const enRem = localizeReminder(viReminder, true, "Bo");
+    expect(enRem.petName).toBe("Bo");
+    expect(enRem.title).toBe("Annual Rabies Booster Vaccination");
+
+    const backToVi = localizeReminder(enRem, false, "Bơ");
+    expect(backToVi.petName).toBe("Bơ");
+    expect(backToVi.title).toBe("Tiêm nhắc lại Mũi dại định kỳ hàng năm");
+
+    expect(localizePersonName("Lê Hoàng Yến", true)).toBe("Le Hoang Yen");
+    expect(localizePersonName("Le Hoang Yen", false)).toBe("Lê Hoàng Yến");
+    expect(localizePersonName("Trần Anh Khoa", true)).toBe("Tran Anh Khoa");
+    expect(localizePersonName("Phạm Minh Đức", true)).toBe("Pham Minh Duc");
+    expect(localizePersonName("Nguyễn Thu Trang", true)).toBe("Nguyen Thu Trang");
+
+    expect(
+      localizeWeightNote(
+        "Cân nặng ghi nhận tại Phòng Khám Thú Y PetCare · Quận 1",
+        true
+      )
+    ).toBe("Weight recorded at PetCare Veterinary Clinic · District 1");
   });
 });

@@ -4,6 +4,17 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { Card } from "@/components/ui/card";
+import {
+  localizePetName,
+  localizeBreed,
+  localizePersonName,
+  localizeClinicAddress,
+  localizeAllergy,
+  localizeCondition,
+  localizeVaccineName,
+  localizeClinicName,
+  localizeDoctorName,
+} from "@/modules/i18n/localize-data";
 
 // ==================== INTERFACES ====================
 
@@ -502,13 +513,41 @@ export function ClinicPetRecordsView({ locale }: { locale: string }) {
 
   const loadSavedRecords = useCallback(() => {
     const defaultPets = getDefaultDemoPets(isEn);
+    const defaultById = new Map(defaultPets.map((d) => [d.id, d]));
+
+    const localizeRecord = (p: PetRecordData): PetRecordData => {
+      const template = defaultById.get(p.id);
+      return {
+        ...p,
+        name: localizePetName(p.name, isEn),
+        breed: localizeBreed(p.breed, p.species, isEn),
+        ageDisplay: template?.ageDisplay || p.ageDisplay,
+        color: template?.color || p.color,
+        statusText: template?.statusText || p.statusText,
+        dietaryNotes: template?.dietaryNotes || p.dietaryNotes,
+        owner: {
+          ...p.owner,
+          name: localizePersonName(p.owner?.name, isEn),
+          address: localizeClinicAddress(p.owner?.address || "", isEn),
+        },
+        allergies: (p.allergies || []).map((a) => localizeAllergy(a, isEn)),
+        conditions: (p.conditions || []).map((c) => localizeCondition(c, isEn)),
+        vaccinations: (p.vaccinations || []).map((v) => ({
+          ...v,
+          name: localizeVaccineName(v.name, isEn),
+          veterinarian: localizeDoctorName(v.veterinarian, isEn),
+          clinic: localizeClinicName(v.clinic, isEn),
+        })),
+      };
+    };
+
     if (typeof window !== "undefined") {
       try {
         const stored = localStorage.getItem("pawcare-clinic-pet-records");
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setPetList(parsed);
+            setPetList(parsed.map((p: PetRecordData) => localizeRecord(p)));
             return;
           }
         }

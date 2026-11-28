@@ -280,11 +280,16 @@ export function CarePlansView({
       }
     } catch {}
 
+    const defaultSeeds = getDefaultChatMessages(isEn, selectedPlan);
     if (!loaded || loaded.length === 0) {
-      loaded = getDefaultChatMessages(isEn, selectedPlan);
+      loaded = defaultSeeds;
       try {
         localStorage.setItem(planKey, JSON.stringify(loaded));
       } catch {}
+    } else {
+      // Refresh seed messages for active locale while preserving user-sent messages
+      const seedById = new Map(defaultSeeds.map((m) => [m.id, m]));
+      loaded = loaded.map((m) => seedById.get(m.id) || m);
     }
     setChatMessages(loaded);
   }, [selectedPlan?.id, isEn]);

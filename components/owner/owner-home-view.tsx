@@ -36,6 +36,9 @@ import {
   localizeAge,
   formatBirthdate,
   localizeAllergy,
+  localizeCondition,
+  localizePersonName,
+  localizePetName,
 } from "@/modules/i18n/localize-data";
 import { useOwnerPlan } from "@/lib/hooks/use-owner-plan";
 
@@ -67,7 +70,8 @@ export function OwnerHomeView({
   const [pets, setPets] = useState<PetSummary[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const { plan: currentPlan, isPremium, isFree } = useOwnerPlan();
-  const [displayName, setDisplayName] = useState(userName);
+  const [rawDisplayName, setDisplayName] = useState(userName);
+  const displayName = localizePersonName(rawDisplayName, isEn);
 
   useEffect(() => {
     const updateNameFromStorage = () => {
@@ -134,16 +138,11 @@ export function OwnerHomeView({
           if (Array.isArray(parsed)) {
             const normalized = parsed.map((p) => ({
               ...p,
-              name: isEn
-                ? p.name === "Bơ"
-                  ? "Bo"
-                  : p.name
-                : p.name === "Bo"
-                ? "Bơ"
-                : p.name,
+              name: localizePetName(p.name, isEn),
               breed: localizeBreed(p.breed, p.species, isEn),
               birthDate: p.birthDate || (p.age && p.age.match(/^\d{4}-\d{2}-\d{2}$/) ? p.age : undefined),
               age: p.birthDate ? formatBirthdate(p.birthDate, isEn) : localizeAge(p.age, isEn),
+              medicalHistory: p.medicalHistory ? localizeCondition(p.medicalHistory, isEn) : p.medicalHistory,
               allergies: (p.allergies || []).map((al: string) =>
                 localizeAllergy(al, isEn)
               ),

@@ -4,6 +4,13 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { Card } from "@/components/ui/card";
+import {
+  localizeAppointment,
+  localizePersonName,
+  localizeBreed,
+  localizeServiceName,
+  localizePetName,
+} from "@/modules/i18n/localize-data";
 
 interface StoredClinic {
   name: string;
@@ -130,15 +137,28 @@ export function ClinicHomeView({
           const parsed = JSON.parse(storedApts);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setTodayQueue(
-              parsed.slice(0, 4).map((apt: any) => ({
-                id: apt.id,
-                time: apt.time || "09:30",
-                petName: apt.petName || (isEn ? "Bo" : "Bơ"),
-                breed: apt.pets?.[0]?.breed || apt.breed || (isEn ? "Companion pet" : "Thú cưng"),
-                ownerName: apt.ownerName || (isEn ? "Pet owner" : "Chủ nuôi"),
-                service: apt.service || (isEn ? "General checkup" : "Khám tổng quát"),
-                status: apt.status || "confirmed",
-              }))
+              parsed.slice(0, 4).map((rawApt: any) => {
+                const apt = localizeAppointment(rawApt, isEn);
+                return {
+                  id: apt.id,
+                  time: apt.time || "09:30",
+                  petName: localizePetName(apt.petName || "Bơ", isEn),
+                  breed: localizeBreed(
+                    apt.pets?.[0]?.breed || (rawApt as any).breed,
+                    apt.pets?.[0]?.species,
+                    isEn
+                  ),
+                  ownerName: localizePersonName(
+                    apt.ownerName || (isEn ? "Pet owner" : "Chủ nuôi"),
+                    isEn
+                  ),
+                  service: localizeServiceName(
+                    apt.service || (isEn ? "General checkup" : "Khám tổng quát"),
+                    isEn
+                  ),
+                  status: apt.status || "confirmed",
+                };
+              })
             );
           }
         }
