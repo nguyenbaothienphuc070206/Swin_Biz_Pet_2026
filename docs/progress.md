@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-28 — Fix PDF `[Verified]` Ligature Spacing & Complete English PDF Clinical Field Localization
+
+- Root cause of `[Verifi ed]` spacing gap: `pdf-lib`'s `CustomFontEmbedder` computes the PDF CIDFont `/W` width array exclusively from single-codepoint glyphs in `font.characterSet`. When `fontkit` applied OpenType `liga` GSUB substitution during `font.layout("[Verified]")`, `f` + `i` collapsed into unmapped ligature glyph ID `336` (advance width `708`), which was omitted from `/W` and fell back to PDF default width `DW = 1000` (+292 units of phantom whitespace).
+- Passed `features: { liga: false, clig: false, dlig: false, calt: false, rlig: false }` to `pdf.embedFont` for both Regular and Bold fonts in `modules/passport/pdf.ts`, ensuring every rendered character maps 1:1 to a Unicode codepoint with its exact advance width in `/W`.
+- Added `localizePrescriptionDose`, `localizePrescriptionInstructions`, `localizeAllergySeverity`, `localizeConditionStatus`, and `localizeVisitSummary` in `modules/i18n/localize-data.ts` and wired full field localization inside `createPassportPdf` (`modules/passport/pdf.ts`) so English (`locale=en`) and Vietnamese (`locale=vi`) PDFs render 100% in the target language across prescriptions, allergies, chronic conditions, and clinical visits.
+- Added regression test in `modules/passport/pdf.test.ts` verifying zero unmapped ligature glyphs when laying out `"[Verified] [Certified] Official"`.
+
 ## 2026-11-28 — Complete Bilingual (VI ↔ EN) Dynamic Data Localization for Reminders & Paired Records
 
 - Added `localizeReminder`, `localizePersonName`, `localizePetName`, and `localizeWeightNote` in `modules/i18n/localize-data.ts` and expanded `BREED_PAIRS`, `ALLERGY_PAIRS`, `localizeCondition`, `localizeVaccineName`, `SERVICE_PAIRS`, `localizeAppointment`, `PLAN_DIAGNOSES`, `PLAN_DIET`, `PLAN_NOTES`, `TASK_MAP`, and `SCHEDULE_DESC_MAP` to cover all 4 paired Premium Owner accounts (`Lê Hoàng Yến · Bơ`, `Trần Anh Khoa · Mochi`, `Phạm Minh Đức · Lu`, `Nguyễn Thu Trang · Miu Miu`).

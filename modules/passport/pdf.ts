@@ -5,6 +5,21 @@ import { PDFDocument, rgb, PDFFont } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import QRCode from "qrcode";
 import type { RabiesStatusResult } from "./share-service";
+import {
+  localizePetName,
+  localizeBreed,
+  localizePersonName,
+  localizeClinicName,
+  localizeClinicAddress,
+  localizeVaccineName,
+  localizePrescriptionDose,
+  localizePrescriptionInstructions,
+  localizeAllergy,
+  localizeAllergySeverity,
+  localizeCondition,
+  localizeConditionStatus,
+  localizeVisitSummary,
+} from "@/modules/i18n/localize-data";
 
 export interface PassportPdfInput {
   locale: "vi" | "en";
@@ -163,9 +178,24 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     join(process.cwd(), "public", "fonts", "be-vietnam-pro-vietnamese-700.woff")
   );
 
-  // Use subset: false so every embedded glyph in the font remains intact across all PDF viewers
-  const regularFont = await pdf.embedFont(regularFontBytes, { subset: false });
-  const boldFont = await pdf.embedFont(boldFontBytes, { subset: false });
+  // Disable OpenType ligatures (liga/clig/dlig/calt) because pdf-lib's CustomFontEmbedder
+  // only populates /W widths for direct Unicode codepoints in font.characterSet.
+  // Unmapped GSUB ligatures like "fi" in "[Verified]" would otherwise default to DW=1000 ("Verifi ed").
+  const noLigatureFeatures = {
+    liga: false,
+    clig: false,
+    dlig: false,
+    calt: false,
+    rlig: false,
+  };
+  const regularFont = await pdf.embedFont(regularFontBytes, {
+    subset: false,
+    features: noLigatureFeatures,
+  });
+  const boldFont = await pdf.embedFont(boldFontBytes, {
+    subset: false,
+    features: noLigatureFeatures,
+  });
 
   const regularSet = new Set<number>(regularFont.getCharacterSet());
   const boldSet = new Set<number>(boldFont.getCharacterSet());
@@ -174,6 +204,14 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
   const safeBold = (s?: string | null) => sanitizePdfText(s, boldSet);
 
   const isVi = input.locale === "vi";
+  const isEn = !isVi;
+
+  // Normalize all dynamic input fields to match the requested PDF locale (vi or en)
+  const localizedPetName = localizePetName(input.pet.name, isEn);
+  const localizedBreed = localizeBreed(input.pet.breed, input.pet.species, isEn);
+  const localizedIssuingClinic = input.rabiesStatus.issuingClinic
+    ? localizeClinicName(input.rabiesStatus.issuingClinic, isEn)
+    : undefined;
   const sections = new Set(
     input.sections || ["vaccinations", "medications", "allergies", "conditions", "visits"]
   );
@@ -197,7 +235,7 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
 
   const drawPageHeaderMini = () => {
     page.drawText(
-      safeReg(`PawCare · ${input.pet.name} (${input.pet.species}) · ID: ${input.recordId.slice(0, 8)}`),
+      safeReg(`PawCare · ${localizedPetName} (${input.pet.species}) · ID: ${input.recordId.slice(0, 8)}`),
       {
         x: leftX,
         y,
@@ -301,7 +339,7 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     borderWidth: 0.8,
   });
 
-  const petName = safeBold(input.pet.name.toUpperCase());
+  const petName = safeBold(localizedPetName.toUpperCase());
   page.drawText(petName, {
     x: leftX + 14,
     y: y - 20,
@@ -335,7 +373,7 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
       : input.pet.species;
 
   const speciesBreed = safeReg(
-    `${speciesLabel} · ${input.pet.breed || (isVi ? "Giống tiêu chuẩn" : "Standard breed")} · ${genderLabel}`
+    `${speciesLabel} · ${localizedBreed || (isVi ? "Giống tiêu chuẩn" : "Standard breed")} · ${genderLabel}`
   );
   page.drawText(speciesBreed, {
     x: leftX + 14,
@@ -364,10 +402,12 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
   });
 
   if (input.ownerContact) {
+    const localizedOwnerName = localizePersonName(input.ownerContact.name, isEn);
+    const localizedOwnerDistrict = localizeClinicAddress(input.ownerContact.district || "", isEn);
     const ownerStr = safeBold(
-      `${isVi ? "Chủ nuôi" : "Owner"}: ${input.ownerContact.name || "N/A"} · ${
+      `${isVi ? "Chủ nuôi" : "Owner"}: ${localizedOwnerName || "N/A"} · ${
         input.ownerContact.phone || ""
-      } · ${input.ownerContact.district || ""}`
+      } · ${localizedOwnerDistrict}`
     );
     page.drawText(ownerStr, {
       x: leftX + 14,
@@ -415,10 +455,10 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     ? isVi
       ? `Hiệu lực đến: ${rabies.expiresAt} (còn ${rabies.daysRemaining} ngày) · Lô: ${
           rabies.lot || "N/A"
-        } · Cơ sở cấp: ${rabies.issuingClinic || "Phòng khám thú y PawCare"}`
+        } · Cơ sở cấp: ${localizedIssuingClinic || "Phòng khám thú y PawCare"}`
       : `Valid until: ${rabies.expiresAt} (${rabies.daysRemaining} days left) · Lot: ${
           rabies.lot || "N/A"
-        } · Clinic: ${rabies.issuingClinic || "Verified Practice"}`
+        } · Clinic: ${localizedIssuingClinic || "Verified Practice"}`
     : isVi
     ? "Theo Nghị định 90/2017/NĐ-CP & Thông tư 07/2016/TT-BNNPTNT, tiêm phòng dại là bắt buộc đối với chó mèo."
     : "Mandatory under Vietnam Veterinary Regulations. Unvaccinated pets risk animal quarantine and penalties.";
@@ -501,10 +541,15 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
       const isVerified = vax.verified ?? true;
       const rowY = y;
 
-      const rawVaxTitle = `${vax.name}${vax.lot ? ` (${vax.lot})` : ""}`;
+      const localizedVaxName = localizeVaccineName(vax.name, isEn);
+      const localizedVaxClinic = localizeClinicName(
+        vax.clinic || "PawCare Partner Clinic",
+        isEn
+      );
+      const rawVaxTitle = `${localizedVaxName}${vax.lot ? ` (${vax.lot})` : ""}`;
       const vaxName = truncateToWidth(rawVaxTitle, boldFont, 8, 176, boldSet);
       const clinicLabel = truncateToWidth(
-        vax.clinic || "PawCare Partner Clinic",
+        localizedVaxClinic,
         regularFont,
         8,
         116,
@@ -582,13 +627,15 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     y -= 14;
 
     for (const med of input.prescriptions) {
+      const localizedDose = localizePrescriptionDose(med.dose, isEn);
+      const localizedInstructions = localizePrescriptionInstructions(med.instructions, isEn);
       const detailText = `${isVi ? "Bắt đầu" : "Started"}: ${med.startedAt}${
         med.endedAt ? ` · ${isVi ? "Kết thúc" : "Ended"}: ${med.endedAt}` : ""
-      } · ${med.instructions}`;
+      } · ${localizedInstructions}`;
       const wrappedDetails = wrapPdfText(detailText, regularFont, 8, contentWidth - 24, regularSet);
       checkPageBreak(18 + wrappedDetails.length * 12);
 
-      page.drawText(safeBold(`• ${med.name} — ${med.dose}`), {
+      page.drawText(safeBold(`• ${med.name} — ${localizedDose}`), {
         x: leftX + 8,
         y: y - 10,
         size: 8.5,
@@ -632,7 +679,13 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
 
     if (input.allergies && input.allergies.length > 0) {
       const allergyStr = `${isVi ? "Dị ứng" : "Allergies"}: ${input.allergies
-        .map((a) => `${a.name} (${a.severity || (isVi ? "theo dõi" : "monitor")})`)
+        .map(
+          (a) =>
+            `${localizeAllergy(a.name, isEn)} (${localizeAllergySeverity(
+              a.severity,
+              isEn
+            )})`
+        )
         .join(", ")}`;
       const lines = wrapPdfText(allergyStr, regularFont, 8.5, contentWidth - 16, regularSet);
       for (const line of lines) {
@@ -651,7 +704,13 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
 
     if (input.conditions && input.conditions.length > 0) {
       const condStr = `${isVi ? "Bệnh nền & Ghi chú" : "Conditions"}: ${input.conditions
-        .map((c) => `${c.name} [${c.status || (isVi ? "đang theo dõi" : "active")}]`)
+        .map(
+          (c) =>
+            `${localizeCondition(c.name, isEn)} [${localizeConditionStatus(
+              c.status,
+              isEn
+            )}]`
+        )
         .join(", ")}`;
       const lines = wrapPdfText(condStr, regularFont, 8.5, contentWidth - 16, regularSet);
       for (const line of lines) {
@@ -686,8 +745,10 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
     y -= 14;
 
     for (const visit of input.visits.slice(0, 6)) {
+      const localizedVisitClinic = localizeClinicName(visit.clinicName, isEn);
+      const localizedSummary = localizeVisitSummary(visit.summary, isEn);
       const summaryLines = wrapPdfText(
-        visit.summary,
+        localizedSummary,
         regularFont,
         8,
         contentWidth - 24,
@@ -695,7 +756,7 @@ export async function createPassportPdf(input: PassportPdfInput): Promise<Uint8A
       );
       checkPageBreak(18 + summaryLines.length * 12);
 
-      page.drawText(safeBold(`${visit.date} · ${visit.clinicName}`), {
+      page.drawText(safeBold(`${visit.date} · ${localizedVisitClinic}`), {
         x: leftX + 8,
         y: y - 10,
         size: 8.5,

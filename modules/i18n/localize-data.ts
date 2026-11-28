@@ -115,6 +115,157 @@ export function localizeWeightNote(note?: string, isEn: boolean = false): string
   return trimmed;
 }
 
+// ==================== PRESCRIPTIONS, SEVERITIES & CLINICAL VISITS ====================
+const PRESCRIPTION_DOSE_PAIRS: Array<[string, string]> = [
+  ["1 viên nhai", "1 chewable tablet"],
+  ["1 viên", "1 tablet"],
+  ["2 viên", "2 tablets"],
+  ["1 ống", "1 pipette"],
+  ["1 cm gel", "1 cm gel"],
+  ["10 ml", "10 ml"],
+];
+
+export function localizePrescriptionDose(dose?: string, isEn: boolean = false): string {
+  if (!dose) return "";
+  const trimmed = dose.trim();
+  for (const [vi, en] of PRESCRIPTION_DOSE_PAIRS) {
+    if (trimmed.toLowerCase() === vi.toLowerCase() || trimmed.toLowerCase() === en.toLowerCase()) {
+      return isEn ? en : vi;
+    }
+  }
+  if (isEn) {
+    return trimmed
+      .replace(/\bviên nhai\b/gi, "chewable tablet")
+      .replace(/\bviên\b/gi, "tablet");
+  }
+  return trimmed
+    .replace(/\bchewable tablets?\b/gi, "viên nhai")
+    .replace(/\btablets?\b/gi, "viên");
+}
+
+const PRESCRIPTION_INSTRUCTION_PAIRS: Array<[string, string]> = [
+  ["Cho uống cùng thức ăn buổi sáng", "Administer with food in the morning"],
+  ["Thoa ủ bọt 10 phút trước khi xả nước ấm", "Lather for 10 minutes before warm rinse"],
+  ["Cho nhai trực tiếp hoặc trộn thức ăn", "Give directly or mix with food"],
+  ["Bôi dọc viền nướu mỗi tối sau ăn", "Apply along gumline every evening after meals"],
+  ["Uống định kỳ phòng ve rận & giun tim", "Monthly preventative for fleas, ticks & heartworm"],
+  ["Uống phòng ve rận & giun tim", "Preventative for fleas, ticks & heartworm"],
+  ["Phòng ve rận & giun tim", "Flea, tick & heartworm prevention"],
+  ["Uống sau bữa ăn, bảo vệ trong 12 tuần", "Give after meal, protects for 12 weeks"],
+];
+
+export function localizePrescriptionInstructions(inst?: string, isEn: boolean = false): string {
+  if (!inst) return "";
+  const trimmed = inst.trim();
+  for (const [vi, en] of PRESCRIPTION_INSTRUCTION_PAIRS) {
+    if (trimmed.toLowerCase() === vi.toLowerCase() || trimmed.toLowerCase() === en.toLowerCase()) {
+      return isEn ? en : vi;
+    }
+  }
+  if (isEn) {
+    return trimmed
+      .replace(/1 lần \/ ngày/gi, "Once daily")
+      .replace(/2 lần \/ tuần/gi, "Twice weekly")
+      .replace(/1 viên \/ tháng/gi, "1 tablet / month")
+      .replace(/Phòng bệnh định kỳ/gi, "Ongoing preventative")
+      .replace(/(\d+)\s*ngày/gi, "$1 days")
+      .replace(/(\d+)\s*tuần/gi, "$1 weeks");
+  }
+  return trimmed
+    .replace(/Once daily(?:\s*\(SID\))?/gi, "1 lần / ngày")
+    .replace(/Twice weekly/gi, "2 lần / tuần")
+    .replace(/Ongoing preventative/gi, "Phòng bệnh định kỳ");
+}
+
+const ALLERGY_SEVERITY_PAIRS: Array<[string, string]> = [
+  ["trung bình", "moderate"],
+  ["nhẹ", "mild"],
+  ["nặng", "severe"],
+  ["nghiêm trọng", "severe"],
+  ["theo dõi", "monitor"],
+];
+
+export function localizeAllergySeverity(sev?: string, isEn: boolean = false): string {
+  if (!sev) return isEn ? "monitor" : "theo dõi";
+  const trimmed = sev.trim();
+  for (const [vi, en] of ALLERGY_SEVERITY_PAIRS) {
+    if (trimmed.toLowerCase() === vi.toLowerCase() || trimmed.toLowerCase() === en.toLowerCase()) {
+      return isEn ? en : vi;
+    }
+  }
+  return trimmed;
+}
+
+const CONDITION_STATUS_PAIRS: Array<[string, string]> = [
+  ["đang kiểm soát", "controlled"],
+  ["đang điều trị", "in treatment"],
+  ["đang theo dõi", "monitoring"],
+  ["ổn định", "stable"],
+  ["đang hồi phục", "recovering"],
+  ["active", "active"],
+];
+
+export function localizeConditionStatus(status?: string, isEn: boolean = false): string {
+  if (!status) return isEn ? "active" : "đang theo dõi";
+  const trimmed = status.trim();
+  for (const [vi, en] of CONDITION_STATUS_PAIRS) {
+    if (trimmed.toLowerCase() === vi.toLowerCase() || trimmed.toLowerCase() === en.toLowerCase()) {
+      return isEn ? en : vi;
+    }
+  }
+  return trimmed;
+}
+
+const VISIT_SUMMARY_PAIRS: Array<[string, string]> = [
+  [
+    "Khám da liễu & Soi tế bào học tai: Viêm da dị ứng cấp tính kèm vết trầy xước thứ phát do cào gãi.",
+    "Dermatology Exam & Ear Cytology: Acute allergic dermatitis with secondary bacterial excoriation.",
+  ],
+  [
+    "Khám sức khỏe định kỳ & Tiêm nhắc 4 bệnh: Mèo khỏe mạnh, có ít mảng bám vôi răng nhẹ.",
+    "Annual Wellness Checkup & 4-in-1 Booster: Healthy feline companion with mild dental tartar.",
+  ],
+  [
+    "Khám kiểm dịch xuất cảnh & Kiểm tra vi mạch: Đạt chuẩn kiểm dịch động vật sống. Đủ điều kiện xuất cảnh quốc tế.",
+    "International Travel Certification & Microchip Audit: Fit for international airline transportation. Cleared for travel.",
+  ],
+  [
+    "Lấy cao răng siêu âm & Đánh bóng men răng: Vôi răng độ 1, đã xử lý hoàn tất.",
+    "Ultrasonic Dental Scaling & Polishing: Grade 1 periodontal tartar, resolved.",
+  ],
+  [
+    "Khám tiền phẫu nha khoa & Xét nghiệm máu: Viêm nướu nhẹ do mảng bám cao răng, chỉ định lấy cao răng siêu âm.",
+    "Pre-Surgical Dental Exam & Bloodwork: Mild gingivitis due to tartar buildup; ultrasonic scaling indicated.",
+  ],
+  [
+    "Tái khám sau triệt sản & Tư vấn dinh dưỡng tiết niệu: Hồi phục hoàn toàn sau triệt sản. Cần duy trì chế độ chống búi lông và sỏi tiết niệu.",
+    "Post-Spay Follow-up & Urinary Nutrition Consult: Full recovery post-spay. Maintain hairball and urinary stone prevention diet.",
+  ],
+  [
+    "Khám lâm sàng định kỳ và đối chiếu sổ tiêm chủng điện tử. Thể trạng ổn định.",
+    "Routine clinical examination and digital immunization audit. Vitals stable.",
+  ],
+  [
+    "Tiêm chủng định kỳ vắc-xin 7 bệnh và phòng dại. Tình trạng sức khỏe tốt, thân nhiệt 38.4°C.",
+    "Routine 7-in-1 and rabies vaccination. Healthy physical condition, temperature 38.4°C.",
+  ],
+  [
+    "Khám định kỳ, kiểm tra tai mũi họng và tiêm phòng nhắc lại mũi 7 bệnh + dại.",
+    "Routine checkup, ENT examination, and 7-in-1 + rabies booster vaccination.",
+  ],
+];
+
+export function localizeVisitSummary(summary?: string, isEn: boolean = false): string {
+  if (!summary) return "";
+  const trimmed = summary.trim();
+  for (const [vi, en] of VISIT_SUMMARY_PAIRS) {
+    if (trimmed.toLowerCase() === vi.toLowerCase() || trimmed.toLowerCase() === en.toLowerCase()) {
+      return isEn ? en : vi;
+    }
+  }
+  return trimmed;
+}
+
 // ==================== BREED TRANSLATIONS ====================
 const BREED_PAIRS: Array<[string, string]> = [
   ["Corgi Wales Pembroke", "Pembroke Welsh Corgi"],

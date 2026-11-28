@@ -151,5 +151,41 @@ describe("pdf: Server-side Pet Health Record PDF Generator", () => {
     const nfd = "Sô\u0309 Y Ba\u0323 ✓ ⚠";
     expect(sanitizePdfText(nfd)).toBe("Sổ Y Bạ [OK] [!]");
   });
+
+  it("disables OpenType fi/fl ligatures so [Verified] has exact glyph widths in PDF /W array", async () => {
+    const { PDFDocument } = await import("pdf-lib");
+    const buf = await readFile(
+      join(process.cwd(), "public", "fonts", "be-vietnam-pro-vietnamese-700.woff")
+    );
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.registerFontkit(fontkit);
+    const embeddedFont = await pdfDoc.embedFont(buf, {
+      subset: false,
+      features: {
+        liga: false,
+        clig: false,
+        dlig: false,
+        calt: false,
+        rlig: false,
+      },
+    });
+
+    // encodeText returns hex string of 2-byte glyph IDs; every glyph ID must exist in the font's characterSet
+    const hex = embeddedFont.encodeText("[Verified] [Certified] Official").toString();
+    const rawHex = hex.replace(/^<|>$/g, "");
+    const glyphIds: number[] = [];
+    for (let i = 0; i < rawHex.length; i += 4) {
+      glyphIds.push(parseInt(rawHex.slice(i, i + 4), 16));
+    }
+
+    const font = fontkit.create(buf);
+    const charSetGlyphIds = new Set(
+      font.characterSet.map((cp) => font.glyphForCodePoint(cp).id)
+    );
+    for (const gid of glyphIds) {
+      expect(charSetGlyphIds.has(gid)).toBe(true);
+    }
+  });
 });
+
 
